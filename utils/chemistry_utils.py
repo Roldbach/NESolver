@@ -1,4 +1,4 @@
-"""A module that handles chemistry related computation in the project.
+"""A utility module that handles chemistry related computation in the project.
 
 Author: Weixun Luo
 Date: 13/04/2024
@@ -6,13 +6,14 @@ Date: 13/04/2024
 import numpy as np
 
 
-A = 0.51  # The temperature-dependent constant in the extended Debye-Huckel equation
-B = 1/305  # The ion size coefficient in the extended Debye-Huckel equation (pm)
-DRIFT_VALUE = 0.197  # The reduction potential of Ag/AgCl reference electrode
-                     # with saturated KCl -> Reference: Book, P345
+A = 0.51  # Temperature-dependent constant in the extended Debye-Huckel equation
+B = 1/305  # Ion size coefficient in the extended Debye-Huckel equation (pm)
+DRIFT_VALUE = 0.197  # Standard reduction potential of Ag/AgCl reference
+                     # electrode with saturated KCl at 25 degrees
+                     # -> Reference: Book, P345
 FARADAY_CONSTANT = 9.6485309e+4  # Faraday constant, F (C mol^-1)
 GAS_CONSTANT = 8.314510  # Gas constant, R (J K^-1 mol^-1)
-TEMPERATURE = 298.15  # The temperature of solution (Kelvin)
+TEMPERATURE = 298.15  # Standard temperature (Kelvin)
 
 
 """----- Activity -----"""
