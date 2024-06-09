@@ -223,7 +223,7 @@ class HyperparameterSearchPipeline:
     # {{{ search
     @timer()
     def search(self) -> typing_utils.Hyperparameter:
-        print('##### Hyperparameter Grid Searching #####')
+        print('##### Hyperparameter Grid Search #####')
         hyperparameter_optimal, score_optimal = self._search()
         self._print_search_outcome(hyperparameter_optimal, score_optimal)
         return hyperparameter_optimal

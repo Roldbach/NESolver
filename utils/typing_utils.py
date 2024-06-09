@@ -1,4 +1,4 @@
-"""A module that contains customised types in the project.
+"""A utility module that contains customised types used in the project.
 
 Author: Weixun Luo
 Date: 10/04/2024
@@ -12,7 +12,7 @@ from torch import optim
 
 
 class DataPack(typing.TypedDict):
-    """A data pack that contains everything about the experiment."""
+    """All required data for multivariate ion analysis."""
     charge: np.ndarray
     ion_size: np.ndarray
     selectivity_coefficient: np.ndarray
@@ -23,6 +23,7 @@ class DataPack(typing.TypedDict):
     potential: np.ndarray
 
 class Hyperparameter(typing.TypedDict):
-    lr: float
-    optimizer: optim.Optimizer
-    criterion: nn.Module
+    """All hyperparameters for training TrainableAgent."""
+    learning_rate: float
+    optimiser_class: optim.Optimizer
+    criterion_class: nn.Module
