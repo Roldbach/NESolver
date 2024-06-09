@@ -1,4 +1,4 @@
-"""A module that specifies directory and file paths in the project.
+"""A utility module that specifies directory and file paths in the project.
 
 Author: Weixun Luo
 Date: 06/04/2024
