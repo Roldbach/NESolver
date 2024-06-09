@@ -1,4 +1,4 @@
-"""A module that handles data simulation in the project.
+"""A utility module that handles data simulation in the project.
 
 Author: Weixun Luo
 Date: 30/03/2024
