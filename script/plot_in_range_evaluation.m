@@ -22,21 +22,21 @@ DATA_3_ION(2,:,:) = [
     0.27076, 1.3556, 1.3556, 0.000000000174;
 ];  % Concentration (In-range)
 DATA_3_ION(3,:,:) = [
-    0.33422, 8367, 0.33428, 0.0000000000000010063;
-    0.33422, 9613.4, 0.33422, 0.000000000000015819;
-    69798000000, 9379, 0.33422, 4.5233e-17;
-];  % Selectivity Coefficient
+    2.1668, 126.97, 2.3214, 0.0000000000012915;
+    1.5857, 129.25, 1.6071, 0.000000000000014798;
+    1.7388, 128.93, 1.7409, 0.00000000000011271;
+];  % Drift
 DATA_3_ION(4,:,:) = [
     0.00095815, 0.00095815, 0.0010264, 7.0083E-16;
     0.00068295, 0.00068295, 0.00069251, 0.000000000000014798;
     0.00075269, 0.00075269, 0.00075361, 5.3198E-17;
 ];  % Slope
 DATA_3_ION(5,:,:) = [
-    2.1668, 126.97, 2.3214, 0.0000000000012915;
-    1.5857, 129.25, 1.6071, 0.000000000000014798;
-    1.7388, 128.93, 1.7409, 0.00000000000011271;
-];  % Drift
-THRESHOLD_3_ION = [3.3421871124572866e-06, 1e-3, 1e-3];
+    0.33422, 8367, 0.33428, 0.0000000000000010063;
+    0.33422, 9613.4, 0.33422, 0.000000000000015819;
+    69798000000, 9379, 0.33422, 4.5233e-17;
+];  % Selectivity Coefficient
+THRESHOLD_3_ION = [1e-3, 1e-3, 3.3421871124572866e-06];
 
 DATA_5_ION = zeros(5,3,4);
 DATA_5_ION(1,:,:) = [
@@ -50,26 +50,26 @@ DATA_5_ION(2,:,:) = [
     15.212, 1710200, 83019000000000, 0.00211;
 ];  % Concentration (In-range)
 DATA_5_ION(3,:,:) = [
-    0.2405, 7266.3, 0.22942, 0.015232;
-    0.23315, 6875.1, 0.24081, 0.013146;
-    0.23357, 7080.2, 0.23285, 0.012247;
-];  % Selectivity Coefficient
+    13.69, 99.794, 14.367, 0.0040953;
+    17.083, 99.854, 17.126, 0.0039526;
+    16.442, 99.726, 16.446, 0.0034937;
+];  % Drift
 DATA_5_ION(4,:,:) = [
     0.0066705, 0.0066705, 0.0069805, 0.0000019657;
     0.0082646, 0.0082646, 0.0082839, 0.0000018717;
     0.0079364, 0.0079364, 0.0079385, 0.0000016368;
 ];  % Slope
 DATA_5_ION(5,:,:) = [
-    13.69, 99.794, 14.367, 0.0040953;
-    17.083, 99.854, 17.126, 0.0039526;
-    16.442, 99.726, 16.446, 0.0034937;
-];  % Drift
-THRESHOLD_5_ION = [2.388734730408741e-06, 1e-3, 1e-3];
+    0.2405, 7266.3, 0.22942, 0.015232;
+    0.23315, 6875.1, 0.24081, 0.013146;
+    0.23357, 7080.2, 0.23285, 0.012247;
+];  % Selectivity Coefficient
+THRESHOLD_5_ION = [1e-3, 1e-3,2.388734730408741e-06];
 
 
 %% Data
 data = -1 * pow2db(DATA_5_ION);
-threshold = -1 * pow2db(THRESHOLD_3_ION);
+threshold = -1 * pow2db(THRESHOLD_5_ION);
 category = categorical({'10','100','1000'});
 
 
@@ -90,7 +90,7 @@ LEGEND_FONT_SIZE = 12;
 TITLE_FONT_SIZE = 16;
 FONT_NAME = 'Times New Roman';
 
-titles = {'Forward Accuracy', 'Backward Accuracy', 'Selectivity Coefficient', 'Slope', 'Intercept'};
+titles = {'Forward Accuracy', 'Backward Accuracy', 'Response Intercept', 'Response Slope', 'Selectivity Coefficient'};
 
 fig = figure;
 set(fig, 'Units', 'inches', 'Position', [1, 1, 8.27, 6]);  % Adjust the figure size to fit an A4 paper width (8.27 inches)
@@ -126,7 +126,7 @@ for i = 1:5
     axis.YAxis.FontSize = TICK_LABEL_FONT_SIZE;
     title(titles{i}, 'FontName', FONT_NAME, 'FontSize', TITLE_FONT_SIZE);
     if i == 4
-        xlabel('Training Sample Number (a.u.)', ...
+        xlabel('#Training Sample', ...
                'FontName', FONT_NAME, 'FontSize', LABEL_FONT_SIZE);
     end
 end
