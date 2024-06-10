@@ -33,7 +33,7 @@ EARLY_STOPPER_PARAMETER = {
     'delta': 0.0,
     'checkpoint_file_path': '.checkpoint.pth',
 }
-EPOCH_OUTCOME_LIMIT = 30  # The number of lines that can be seen in terminal
+EPOCH_OUTCOME_LIMIT = 15  # The number of lines that can be seen in terminal
 HYPERPARAMETER_SPACE = {
     'max_epochs': [1000],
     'lr': [1e-3, 1e-4, 1e-5],
@@ -357,7 +357,7 @@ class AgentTrainingPipeline:
     # {{{ train
     @timer()
     def train(self) -> tuple:
-        print('##### Training #####')
+        print('##### Forward Solving #####')
         while True:
             self._epoch += 1
             self._train()

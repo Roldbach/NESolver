@@ -37,21 +37,6 @@ def _compute_activity_coefficient(
     charge: np.ndarray,
     ion_size: np.ndarray,
 ) -> np.ndarray:
-    """Compute the activity coefficient according to the extended Debye-Huckel
-    equation.
-
-    Argument
-        - concentration: A numpy.ndarray that contains concentration of
-                         ions (M) with shape (#sample, #ISE).
-        - charge: A numpy.ndarray that contains signed charge number of ions
-                  with shape (1, #ISE).
-        - ion_size: A numpy.ndarray that contains the size of ions (pm) with
-                    shape (1, #ISE).
-
-    Return
-        A numpy.ndarray that specifies the corresponding activity coefficients
-    of each ion with shape (#sample, #ISE).
-    """
     return np.apply_along_axis(
         func1d = _compute_activity_coefficient_row,
         axis = 1,
@@ -67,21 +52,8 @@ def _compute_activity_coefficient_row(
     charge: np.ndarray,
     ion_size: np.ndarray,
 ) -> float:
-    """Compute the activity coefficient according to the extended Debye-Huckel
-    equation.
-
-    This function only accepts row vectors as input.
-
-    Argument
-        - concentration_row: A numpy.ndarray that contains concentration of
-                             ions with shape (1, #ISE).
-        - charge: A numpy.ndarray that contains signed charge number of ions
-                  with shape (1, #ISE).
-        - ion_size: A numpy.ndarray that contains the size of ions (pm) with
-                    shape (1, #ISE).
-    Return
-        A float that specifies the corresponding activity coefficients of
-    each ion with shape (1, #ISE).
+    """Compute the activity coefficient for individual ions in a sample using
+    the extended Debye-Huckel equation.
     """
     root_ionic_strength = _compute_root_ionic_strength(
         concentration_row, charge)
