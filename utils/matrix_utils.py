@@ -1,4 +1,5 @@
-"""A module that handles array and tensor-related operations in the project.
+"""A utility module that handles array and tensor-related operations in the
+project.
 
 Author: Weixun Luo
 Date: 29/03/2024
@@ -38,20 +39,20 @@ def build_row_array(
 
 # {{{ build_ones_array
 def build_ones_array(
-    shape: tuple[int, ...], data_type: np.dtype = FLOAT_NUMPY) -> np.ndarray:
+    shape: tuple[int,...], data_type: np.dtype = FLOAT_NUMPY) -> np.ndarray:
     return np.ones(shape, data_type)
 # }}}
 
 # {{{ build_zeros_array
 def build_zeros_array(
-    shape: tuple[int, ...], data_type: np.dtype = FLOAT_NUMPY) -> np.ndarray:
+    shape: tuple[int,...], data_type: np.dtype = FLOAT_NUMPY) -> np.ndarray:
     return np.zeros(shape, data_type)
 # }}}
 
 # {{{ sample_uniform_distribution_array
 def sample_uniform_distribution_array(
-    shape: tuple[int,int], scope: tuple[float,float]) -> np.ndarray:
-    return np.random.uniform(*scope, shape).astype(FLOAT_NUMPY)
+    shape: tuple[int,...], scope: tuple[float,float]) -> np.ndarray:
+    return np.random.uniform(*scope, size=shape).astype(FLOAT_NUMPY)
 # }}}
 
 
@@ -97,7 +98,7 @@ def initialise_weight_tensor(
             return _initialise_Nernst_weight_tensor(shape, kwargs['charge'])
         case 'uniform':
             weight = build_zeros_tensor(shape, requires_grad=True)
-            return nn.init.uniform_(weight, a=1e-14)  # Avoid error in log()
+            return nn.init.uniform_(weight, a=1e-30)  # Avoid error in log()
         case 'zeros':
             weight = build_zeros_tensor(shape, requires_grad=True)
             return nn.init.zeros_(weight)
