@@ -12,7 +12,7 @@ from torch import optim
 
 
 class DataPack(typing.TypedDict):
-    """All required data for multivariate ion analysis."""
+    """A dict that contains all required data for multivariate ion analysis."""
     charge: np.ndarray
     ion_size: np.ndarray
     selectivity_coefficient: np.ndarray
@@ -23,7 +23,7 @@ class DataPack(typing.TypedDict):
     potential: np.ndarray
 
 class Hyperparameter(typing.TypedDict):
-    """All hyperparameters for training TrainableAgent."""
+    """A dict that contains all required hyperparameters for training NESolver."""
     learning_rate: float
     optimiser_class: optim.Optimizer
     criterion_class: nn.Module
