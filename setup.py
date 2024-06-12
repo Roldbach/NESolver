@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(
-    name = 'individual_project',
-    version = '0.0.1',
+    name = 'NESolver',
+    version = '1.0.0',
     packages = setuptools.find_packages(),
 )
