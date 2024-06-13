@@ -3,6 +3,7 @@
 Author: Weixun Luo
 Date: 12/06/2024
 """
+import logging
 import os
 import platform
 import urllib
@@ -15,15 +16,10 @@ ENVIRONMENT_NAME = "NESolver"
 ENVIRONMENT_FILE_PATH = "environment.yml"
 
 
-"""----- Conda Installation -----"""
-# {{{ setup_conda
-def setup_conda() -> None:
-    try:
-        subprocess.run(['conda', '--version'], check=True)
-    except subprocess.CalledProcessError:
-        return False
-# }}}
-
-# {{{ install_conda
-def install_conda() -> None:
+"----- Conda Environment Setup -----"
+# {{{ setup_conda_environment
+def setup_conda_environment(
+    environment_name: str = ENVIRONMENT_NAME,
+    environment_file_path: str = ENVIRONMENT_FILE_PATH,
+) -> None:
 # }}}
