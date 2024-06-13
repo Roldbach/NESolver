@@ -97,7 +97,7 @@ def initialise_weight_tensor(
             return _initialise_Nernst_weight_tensor(shape, kwargs['charge'])
         case 'uniform':
             weight = build_zeros_tensor(shape, requires_grad=True)
-            return nn.init.uniform_(weight, a=1e-30)  # Avoid error in log()
+            return nn.init.uniform_(weight, a=1e-30)  # Avoid zero-error in log()
         case 'zeros':
             weight = build_zeros_tensor(shape, requires_grad=True)
             return nn.init.zeros_(weight)
@@ -109,8 +109,7 @@ def initialise_weight_tensor(
 # {{{ _initialise_Nernst_weight_tensor
 def _initialise_Nernst_weight_tensor(
     shape: tuple[int,...], charge: np.ndarray) -> torch.Tensor:
-    weight = chemistry_utils.compute_Nernst_slope(charge)
-    weight = weight.reshape(shape)
+    weight = chemistry_utils.compute_Nernst_slope(charge).reshape(shape)
     weight = build_tensor(weight, requires_grad=True)
     return weight
 # }}}
