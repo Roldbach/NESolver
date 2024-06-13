@@ -90,7 +90,7 @@ def initialise_weight_tensor(
     match initialisation:
         case 'Ag/AgCl':
             weight = build_zeros_tensor(shape, requires_grad=True)
-            return nn.init.constant_(weight, chemistry_utils.DRIFT_VALUE)
+            return nn.init.constant_(weight, chemistry_utils.Ag_AgCl_INTERCEPT)
         case 'eye':
             return build_identity_tensor(shape[0], requires_grad=True)
         case 'nernst':
