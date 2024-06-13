@@ -58,8 +58,8 @@ def _compute_activity_coefficient_row(
 
 
 """----- Activity Power -----"""
-# {{{ compute_activity_power
-def compute_activity_power(charge: np.ndarray) -> np.ndarray:
+# {{{ compute_Nikolsky_Eisenman_activity_power
+def compute_Nikolsky_Eisenman_activity_power(charge: np.ndarray) -> np.ndarray:
     return np.abs(charge.reshape((-1,1,1)) / charge)
 # }}}
 
