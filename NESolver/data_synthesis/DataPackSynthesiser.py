@@ -1,4 +1,4 @@
-"""A utility module that handles data simulation in the project.
+"""A class that can synthesis data used for multivariate ion analysis.
 
 Author: Weixun Luo
 Date: 30/03/2024
@@ -7,15 +7,15 @@ import numpy as np
 import torch
 from torch import nn
 
-from utils import chemistry_utils
-from utils import matrix_utils
-from utils import typing_utils
+from NESolver.utils import chemistry_utils
+from NESolver.utils import matrix_utils
+from NESolver.utils import typing_utils
 
+check = 1
 
 # {{{ DataPackSimulator
 class DataPackSimulator:
-    """A class that can simulate the data pack based on the Nikolsky-Eisenman
-    equation.
+    """A class that can synthesis data used for multivariate ion analysis.
 
     Attribute
         - _sensor_number: An int that specifies the number of sensors. It is
