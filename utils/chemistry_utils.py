@@ -8,15 +8,14 @@ import numpy as np
 
 A = 0.51  # Temperature-dependent constant in the extended Debye-Huckel equation
 B = 1/305  # Ion size coefficient in the extended Debye-Huckel equation (pm)
-DRIFT_VALUE = 0.197  # Standard reduction potential of Ag/AgCl reference
-                     # electrode with saturated KCl at 25 degrees
-                     # -> Reference: Book, P345
+Ag_AgCl_INTERCEPT = 0.197  # Standard reduction potential of Ag/AgCl reference
+                           # electrode with saturated KCl at 25 celsius
 FARADAY_CONSTANT = 9.6485309e+4  # Faraday constant, F (C mol^-1)
 GAS_CONSTANT = 8.314510  # Gas constant, R (J K^-1 mol^-1)
 TEMPERATURE = 298.15  # Standard temperature (Kelvin)
 
 
-"""----- Activity -----"""
+"""----- Activity / Activity Coefficient -----"""
 # {{{ convert_concentration_to_activity
 def convert_concentration_to_activity(
     concentration: np.ndarray,
@@ -29,8 +28,6 @@ def convert_concentration_to_activity(
     return activity
 # }}}
 
-
-"""----- Activity Coefficient -----"""
 # {{{ _compute_activity_coefficient
 def _compute_activity_coefficient(
     concentration: np.ndarray,
@@ -52,11 +49,7 @@ def _compute_activity_coefficient_row(
     charge: np.ndarray,
     ion_size: np.ndarray,
 ) -> float:
-    """Compute the activity coefficient for individual ions in a sample using
-    the extended Debye-Huckel equation.
-    """
-    root_ionic_strength = _compute_root_ionic_strength(
-        concentration_row, charge)
+    root_ionic_stregth = np.sqrt(0.5* concentration_row @ np.power(charge,2).T)
     numerator = -A * np.power(charge,2) * root_ionic_strength
     denominator = 1 + B*root_ionic_strength*ion_size
     activity_coefficient = np.power(10.0, numerator/denominator)
@@ -67,52 +60,20 @@ def _compute_activity_coefficient_row(
 """----- Activity Power -----"""
 # {{{ compute_activity_power
 def compute_activity_power(charge: np.ndarray) -> np.ndarray:
-    """Compute the power of activity according to the Nikolsky-Eisenman equation.
-
-    Argument
-        - charge: A numpy.ndarray that contains signed charge number of ions
-                  with shape (1, #ISE).
-
-    Return
-        A numpy.ndarray that contains the power of activity with shape
-    (#ISE, 1, #ISE).
-    """
     return np.abs(charge.reshape((-1,1,1)) / charge)
 # }}}
 
 
-"""----- Ionic Strength -----"""
-# {{{ _compute_root_ionic_strength
-def _compute_root_ionic_strength(
-    concentration: np.ndarray, charge: np.ndarray) -> np.ndarray:
-    return np.sqrt(_compute_ionic_strength(concentration, charge))
-# }}}
-
-# {{{ _compute_ionic_strength
-def _compute_ionic_strength(
-    concentration: np.ndarray, charge: np.ndarray) -> np.ndarray:
-    return 0.5 * concentration @ np.power(charge,2).T
-# }}}
-
-
-"""----- Slope -----"""
+"""----- Response Slope -----"""
 # {{{ compute_Nernst_slope
-def compute_Nernst_slope(charge: np.ndarray) -> np.ndarray:
-    """Compute the potential slope of ISEs according to the Nikolsky-Eisenman
-    equation."""
-    numerator = 2.303 * GAS_CONSTANT * TEMPERATURE
-    denominator = FARADAY_CONSTANT * charge
+def compute_Nernst_slope(
+    charge: np.ndarray,
+    gas_constant: float = GAS_CONSTANT,
+    temperature: float = TEMPERATURE,
+    faraday_constant: float = FARADAY_CONSTANT,
+) -> np.ndarray:
+    numerator = 2.303 * gas_constant * temperature
+    denominator = faraday_constant * charge
     slope = numerator / denominator
     return slope
-# }}}
-
-
-"""----- Drift -----"""
-# {{{ compute_Ag_AgCl_drift
-def compute_Ag_AgCl_drift(sensor_number: int) -> np.ndarray:
-    """Compute the potential drift of ISEs based on the reduction potential of
-    Ag/AgCl reference electrode operated under 298.15K.
-    """
-    return np.array(
-        [DRIFT_VALUE for _ in range(sensor_number)], dtype=np.float64).reshape((1,-1))
 # }}}

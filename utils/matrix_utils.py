@@ -92,7 +92,6 @@ def initialise_weight_tensor(
             weight = build_zeros_tensor(shape, requires_grad=True)
             return nn.init.constant_(weight, chemistry_utils.DRIFT_VALUE)
         case 'eye':
-            assert len(shape) == 2
             return build_identity_tensor(shape[0], requires_grad=True)
         case 'nernst':
             return _initialise_Nernst_weight_tensor(shape, kwargs['charge'])
