@@ -15,12 +15,12 @@ class DataPack(typing.TypedDict):
     """A dict that contains all required data for multivariate ion analysis."""
     charge: np.ndarray
     ion_size: np.ndarray
+    response_intercept: np.ndarray
+    response_slope: np.ndarray
     selectivity_coefficient: np.ndarray
-    slope: np.ndarray
-    drift: np.ndarray
     concentration: np.ndarray
     activity: np.ndarray
-    potential: np.ndarray
+    response: np.ndarray
 
 class Hyperparameter(typing.TypedDict):
     """A dict that contains all required hyperparameters for training NESolver."""
