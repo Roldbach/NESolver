@@ -9,8 +9,8 @@ import numpy as np
 import torch
 from torch.utils import data
 
-from utils import chemistry_utils
-from utils import matrix_utils
+from NESolver.utils import chemistry_utils
+from NESolver.utils import matrix_utils
 
 
 # {{{ AgentDataProcessor

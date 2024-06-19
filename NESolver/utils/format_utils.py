@@ -9,6 +9,7 @@ import numpy as np
 SPECIFIER_FLOAT = '.4f'
 SPECIFIER_SCIENTIFIC = '.4e'
 
+
 """----- Float -----"""
 # {{{ format_float_value
 def format_float_value(value: float, unit: str = '') -> str:

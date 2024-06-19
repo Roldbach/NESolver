@@ -17,15 +17,15 @@ from torch import nn
 from torch import optim
 from torchmetrics import regression
 
-from utils import chemistry_utils
-from utils import data_processing_utils
-from utils import data_simulation_utils
-from utils import evaluation_utils
-from utils import format_utils
-from utils import io_utils
-from utils import matrix_utils
-from utils import optimisation_utils
-from utils import typing_utils
+from NESolver.utils import chemistry_utils
+from NESolver.utils import data_processing_utils
+from NESolver.utils import data_simulation_utils
+from NESolver.utils import evaluation_utils
+from NESolver.utils import format_utils
+from NESolver.utils import io_utils
+from NESolver.utils import matrix_utils
+from NESolver.utils import optimisation_utils
+from NESolver.utils import typing_utils
 
 
 EARLY_STOPPER_PARAMETER = {

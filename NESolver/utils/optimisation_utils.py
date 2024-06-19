@@ -14,10 +14,10 @@ from sklearn import model_selection
 import torch
 from torch import nn
 
-from utils import chemistry_utils
-from utils import data_processing_utils
-from utils import io_utils
-from utils import matrix_utils
+from NESolver.utils import chemistry_utils
+from NESolver.utils import data_processing_utils
+from NESolver.utils import io_utils
+from NESolver.utils import matrix_utils
 
 
 VANILLA_POTENTIAL_SOLVER_PARAMETER = {
