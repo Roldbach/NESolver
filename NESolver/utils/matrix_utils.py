@@ -1,4 +1,4 @@
-"""A utility module that handles array and tensor-related operations in the
+"""An utility module that handles array and tensor-based operations in the
 project.
 
 Author: Weixun Luo
@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from utils import chemistry_utils
+from NESolver.utils import chemistry_utils
 
 
 FLOAT_NUMPY = np.float64
@@ -89,27 +89,48 @@ def initialise_weight_tensor(
     shape: tuple[int,...], initialisation: str, **kwargs) -> torch.Tensor:
     match initialisation:
         case 'Ag/AgCl':
-            weight = build_zeros_tensor(shape, requires_grad=True)
-            return nn.init.constant_(weight, chemistry_utils.Ag_AgCl_INTERCEPT)
+            return _initialise_Ag_AgCl_weight_tensor(shape)
         case 'eye':
-            return build_identity_tensor(shape[0], requires_grad=True)
+            return _initialise_identity_weight_tensor(shape)
         case 'nernst':
             return _initialise_Nernst_weight_tensor(shape, kwargs['charge'])
         case 'uniform':
-            weight = build_zeros_tensor(shape, requires_grad=True)
-            return nn.init.uniform_(weight, a=1e-30)  # Avoid zero-error in log()
+            return _initialise_uniform_weight_tensor(shape)
         case 'zeros':
-            weight = build_zeros_tensor(shape, requires_grad=True)
-            return nn.init.zeros_(weight)
+            return _initialise_zeros_weight_tensor(shape)
         case _:
             raise ValueError(
-                f'Cannot find the initialisation: {initialisation}')
+                f'Cannot find the weight initialisation: {initialisation}')
+# }}}
+
+# {{{ _initialise_Ag_AgCl_weight_tensor
+def _initialise_Ag_AgCl_weight_tensor(shape: tuple[int,...]) -> torch.Tensor:
+    weight = build_zeros_tensor(shape, requires_grad=True)
+    weight = nn.init.constant_(weight, chemistry_utils.Ag_AgCl_RESPONSE_INTERCEPT)
+    return weight
+# }}}
+
+# {{{ _initialise_identity_weight_tensor
+def _initialise_identity_weight_tensor(shape: tuple[int,int]) -> torch.Tensor:
+    return build_identity_tensor(shape[0], requires_grad=True)
 # }}}
 
 # {{{ _initialise_Nernst_weight_tensor
 def _initialise_Nernst_weight_tensor(
     shape: tuple[int,...], charge: np.ndarray) -> torch.Tensor:
-    weight = chemistry_utils.compute_Nernst_slope(charge).reshape(shape)
+    weight = chemistry_utils.compute_Nernst_response_slope(charge).reshape(shape)
     weight = build_tensor(weight, requires_grad=True)
     return weight
+# }}}
+
+# {{{ _initialise_uniform_weight_tensor
+def _initialise_uniform_weight_tensor(shape: tuple[int,...]) -> torch.Tensor:
+    weight = build_zeros_tensor(shape, requires_grad=True)
+    weight = nn.init.uniform_(weight, a=1e-30) # To avoid zeros in log()
+    return weight
+# }}}
+
+# {{{ _initialise_zeros_weight_tensor
+def _initialise_zeros_weight_tensor(shape: tuple[int,...]) -> torch.Tensor:
+    return build_zeros_tensor(shape, requires_grad=True)
 # }}}
