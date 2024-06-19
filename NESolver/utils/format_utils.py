@@ -1,4 +1,4 @@
-"""A module that can handle string formatting in the project.
+"""A utility module that handles output formatting in the project.
 
 Author: Weixun Luo
 Date: 25/04/2024

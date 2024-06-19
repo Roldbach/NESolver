@@ -1,4 +1,4 @@
-"""An utility module that handles evaluation in the project.
+"""A utility module that handles evaluation in the project.
 
 Author: Weixun Luo
 Date: 08/04/2024

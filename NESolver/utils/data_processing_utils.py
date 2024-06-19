@@ -1,4 +1,4 @@
-"""A module that handles data processing in the project.
+"""A utility module that handles data processing in the project.
 
 Author: Weixun Luo
 Date: 13/04/2024

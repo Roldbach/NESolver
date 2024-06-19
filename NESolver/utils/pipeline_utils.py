@@ -1,4 +1,4 @@
-"""A module that builds pipelines used in the project.
+"""A utility module that builds pipelines used in the project.
 
 Author: Weixun Luo
 Date: 03/04/2024

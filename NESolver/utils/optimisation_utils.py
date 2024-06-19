@@ -1,4 +1,4 @@
-"""A module that handles optimisation related operations in the project.
+"""A utility module that handles optimisation related operations in the project.
 
 Author: Weixun Luo
 Date: 10/04/2024

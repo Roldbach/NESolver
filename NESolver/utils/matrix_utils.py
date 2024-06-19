@@ -1,4 +1,4 @@
-"""An utility module that handles array and tensor-based operations in the
+"""A utility module that handles array and tensor-based operations in the
 project.
 
 Author: Weixun Luo

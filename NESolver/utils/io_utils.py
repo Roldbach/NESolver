@@ -1,4 +1,4 @@
-"""An utility module that handles file loading and saving in the project.
+"""A utility module that handles file loading and saving in the project.
 
 Author: Weixun Luo
 Date: 01/04/2023
