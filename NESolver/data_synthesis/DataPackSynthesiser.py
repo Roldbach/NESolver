@@ -11,7 +11,6 @@ from NESolver.utils import chemistry_utils
 from NESolver.utils import matrix_utils
 from NESolver.utils import typing_utils
 
-check = 1
 
 # {{{ DataPackSimulator
 class DataPackSimulator:
