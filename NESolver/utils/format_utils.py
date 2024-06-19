@@ -24,10 +24,20 @@ def format_scientific_value(value: float, unit: str = '') -> str:
 """----- Array -----"""
 # {{{ format_float_array
 def format_float_array(array: np.ndarray, unit: str = '') -> str:
-    return '[' + ', '.join([f'{value:{SPECIFIER_FLOAT}}{unit}' for value in array.flatten()]) +']'
+    output = ', '.join(
+        format_float_value(value, unit)
+        for value in array.flatten()
+    )
+    output = f'[{output}]'
+    return output
 # }}}
 
 # {{{ format_scientific_array
 def format_scientific_array(array: np.ndarray, unit: str = '') -> str:
-    return '[' + ', '.join([f'{value:{SPECIFIER_SCIENTIFIC}}{unit}' for value in array.flatten()]) +']'
+    output = ', '.join(
+        format_scientific_value(value, unit)
+        for value in array.flatten()
+    )
+    output = f'[{output}]'
+    return output
 # }}}
