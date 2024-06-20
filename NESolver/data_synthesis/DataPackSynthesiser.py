@@ -12,8 +12,8 @@ from NESolver.utils import matrix_utils
 from NESolver.utils import typing_utils
 
 
-# {{{ DataPackSimulator
-class DataPackSimulator:
+# {{{ DataPackSynthesiser
+class DataPackSynthesiser:
     """A class that can synthesis data used for multivariate ion analysis.
 
     Attribute
@@ -23,25 +23,25 @@ class DataPackSimulator:
                    ions with shape (1, #ISE).
         - _ion_size: A numpy.ndarray that contains the size of ions with shape
                      (1, #ISE).
+        - _response_intercept: A numpy.ndarray that contains the response
+                               intercepts of ISEs with shape (#ISE, 1, 1).
+        - _response_slope: A numpy.ndarray that contains the response slopes of
+                           ISEs with shape (#ISE, 1, 1).
         - _selectivity_coefficient: A numpy.ndarray that contains the reshaped
                                     selectivity coefficients with shape
                                     (#ISE, #ISE, 1).
-        - _slope: A numpy.ndarray that contains the potential slopes of ISEs
-                  with shape (#ISE, 1, 1).
-        - _drift: A numpy.ndarray that contains the potential drifts of ISEs
-                  with shape (#ISE, 1, 1).
 
     Property
         - charge: A numpy.ndarray that contains the signed charge numbers of
                   ions with shape (1, #ISE).
         - ion_size: A numpy.ndarray that contains the size of ions with shape
                     (1, #ISE).
+        - response_intercept: A numpy.ndarray that contains the response
+                              intercepts of ISEs with shape (1, #ISE).
+        - response_slope: A numpy.ndarray that contains the response slopes of
+                          ISEs with shape (1, #ISE).
         - selectivity_coefficient: A numpy.ndarray that specifies the selectivity
                                    coefficients of ISEs with shape (#ISE, #ISE).
-        - slope: A numpy.ndarray that contains the potential slopes of ISEs with
-                 shape (1, #ISE).
-        - drift: A numpy.ndarray that contains the potential drift of ISEs with
-                 shape (1, #ISE).
     """
 
     # {{{ __init__
@@ -55,10 +55,11 @@ class DataPackSimulator:
         self._sensor_number = self._construct_sensor_number(charge)
         self._charge = self._construct_charge(charge)
         self._ion_size = self._construct_ion_size(ion_size)
+        self._response_intercept = self._construct_response_intercept(
+            noise_parameter)
+        self._response_slope = self._construct_response_slope(noise_parameter)
         self._selectivity_coefficient = self._construct_selectivity_coefficient(
             selectivity_coefficient)
-        self._slope = self._construct_slope(noise_parameter)
-        self._drift = self._construct_drift(noise_parameter)
     # }}}
 
     # {{{ _construct_sensor_number
@@ -76,6 +77,28 @@ class DataPackSimulator:
         return matrix_utils.build_array(ion_size)
     # }}}
 
+    # {{{ _construct_response_intercept
+    def _construct_response_intercept(
+        self, noise_parameter: tuple[float, float]) -> np.ndarray:
+        response_intercept = matrix_utils.build_ones_array(
+            (self._sensor_number, 1, 1))
+        response_intercept *= chemistry_utils.Ag_AgCl_RESPONSE_INTERCEPT
+        response_intercept = matrix_utils.add_gaussian_noise_array(
+            response_intercept, noise_parameter)
+        return response_intercept
+    # }}}
+
+    # {{{ _construct_response_slope
+    def _construct_response_slope(
+        self, noise_parameter: tuple[float, float]) -> np.ndarray:
+        response_slope = chemistry_utils.compute_Nernst_response_slope(
+            self._charge)
+        response_slope = matrix_utils.add_gaussian_noise_array(
+            response_slope, noise_parameter)
+        response_slope = response_slope.reshape((self._sensor_number,1,1))
+        return response_slope
+    # }}}
+
     # {{{ _construct_selectivity_coefficient
     def _construct_selectivity_coefficient(
         self, selectivity_coefficient: np.ndarray) -> np.ndarray:
@@ -84,32 +107,6 @@ class DataPackSimulator:
         selectivity_coefficient = selectivity_coefficient.reshape(
             (self._sensor_number, self._sensor_number, 1))
         return selectivity_coefficient
-    # }}}
-
-    # {{{ _construct_slope
-    def _construct_slope(
-        self, noise_parameter: tuple[float, float]) -> np.ndarray:
-        slope = chemistry_utils.compute_Nernst_slope(self.charge)
-        slope = self._add_noise(slope, noise_parameter)
-        slope = slope.reshape((self._sensor_number,1,1))
-        return slope
-    # }}}
-
-    # {{{ _construct_drift
-    def _construct_drift(
-        self, noise_parameter: tuple[float, float]) -> np.ndarray:
-        drift = chemistry_utils.compute_Ag_AgCl_drift(self._sensor_number)
-        drift = self._add_noise(drift, noise_parameter)
-        drift = drift.reshape((self._sensor_number,1,1))
-        return drift
-    # }}}
-
-    # {{{ _add_noise
-    def _add_noise(
-        self, candidate: np.ndarray, parameter: tuple[float, float],
-    ) -> np.ndarray:
-        candidate += np.random.normal(*parameter, candidate.shape)
-        return candidate
     # }}}
 
     # {{{ @property: charge
@@ -124,6 +121,18 @@ class DataPackSimulator:
         return matrix_utils.build_row_array(self._ion_size)
     # }}}
 
+    # {{{ @property: response_intercept
+    @property
+    def response_intercept(self) -> np.ndarray:
+        return matrix_utils.build_row_array(self._response_intercept)
+    # }}}
+
+    # {{{ @property: response_slope
+    @property
+    def response_slope(self) -> np.ndarray:
+        return matrix_utils.build_row_array(self._response_slope)
+    # }}}
+
     # {{{ @property: selectivity_coefficient
     @property
     def selectivity_coefficient(self) -> np.ndarray:
@@ -132,18 +141,6 @@ class DataPackSimulator:
         selectivity_coefficient = selectivity_coefficient.reshape(
             (self._sensor_number, self._sensor_number))
         return selectivity_coefficient
-    # }}}
-
-    # {{{ @property: slope
-    @property
-    def slope(self) -> np.ndarray:
-        return matrix_utils.build_row_array(self._slope)
-    # }}}
-
-    # {{{ @property: drift
-    @property
-    def drift(self) -> np.ndarray:
-        return matrix_utils.build_row_array(self._drift)
     # }}}
 
     # {{{ simulate
