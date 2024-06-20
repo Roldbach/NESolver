@@ -143,38 +143,38 @@ class DataPackSynthesiser:
         return selectivity_coefficient
     # }}}
 
-    # {{{ simulate
-    def simulate(self, scope_to_sample_number: dict) -> typing_utils.DataPack:
-        concentration = self._simulate_concentration(scope_to_sample_number)
-        activity = self._simulate_activity(concentration)
-        potential = self._simulate_potential(activity)
+    # {{{ synthesis
+    def synthesis(self, scope_to_sample_number: dict) -> typing_utils.DataPack:
+        concentration = self._synthesis_concentration(scope_to_sample_number)
+        activity = self._synthesis_activity(concentration)
+        response = self._synthesis_response(activity)
         return {
             'charge': self.charge,
             'ion_size': self.ion_size,
+            'response_intercept': self.response_intercept,
+            'response_slope': self.response_slope,
             'selectivity_coefficient': self.selectivity_coefficient,
-            'slope': self.slope,
-            'drift': self.drift,
             'concentration': concentration,
             'activity': activity,
-            'potential': potential,
+            'response': response,
         }
     # }}}
 
-    # {{{ _simulate_concentration
-    def _simulate_concentration(
+    # {{{ _synthesis_concentration
+    def _synthesis_concentration(
         self, scope_to_sample_number: dict) -> np.ndarray:
         return np.vstack([
-            self._simulate_concentration_helper(scope, sample_number)
+            self._synthesis_concentration_helper(scope, sample_number)
             for scope, sample_number in scope_to_sample_number.items()
         ])
     # }}}
 
-    # {{{ _simulate_concentration_helper
-    def _simulate_concentration_helper(
+    # {{{ _synthesis_concentration_helper
+    def _synthesis_concentration_helper(
         self, scope: tuple[float,float], sample_number: int,
     ) -> np.ndarray:
         concentration = matrix_utils.sample_uniform_distribution_array(
-            (sample_number,self._sensor_number-1), scope)
+            (sample_number, self._sensor_number-1), scope)
         concentration = self._append_Cl_concentration(concentration)
         return concentration
     # }}}
@@ -195,37 +195,26 @@ class DataPackSynthesiser:
         return Cl_concentration
     # }}}
 
-    # {{{ _simulate_activity
-    def _simulate_activity(self, concentration: np.ndarray) -> np.ndarray:
+    # {{{ _synthesis_activity
+    def _synthesis_activity(self, concentration: np.ndarray) -> np.ndarray:
         return chemistry_utils.convert_concentration_to_activity(
-            concentration, self.charge, self.ion_size)
+            concentration, self._charge, self._ion_size)
     # }}}
 
-    # {{{ _simulate_potential
-    def _simulate_potential(self, activity: np.ndarray) -> np.ndarray:
+    # {{{ _synthesis_response
+    def _synthesis_response(self, activity: np.ndarray) -> np.ndarray:
         activity = self._pre_process_activity(activity)
-        potential = np.log10(activity @ self._selectivity_coefficient)
-        potential = self._drift + self._slope*potential
-        potential = np.transpose(potential, (1,0,2))
-        potential = potential.reshape((-1, self._sensor_number))
-        return potential
+        response = np.log10(activity @ self._selectivity_coefficient)
+        response = self._drift + self._slope*response
+        response = np.transpose(response, (1,0,2))
+        response = response.reshape((-1, self._sensor_number))
+        return response
     # }}}
 
     # {{{ _pre_process_activity
     def _pre_process_activity(self, activity: np.ndarray) -> np.ndarray:
-        """Expand and power the activity of ions according to the Nikolsky-
-        Eisenman equation.
-
-        Argument
-            - activity: A numpy.ndarray that contains activity of ions with
-                        shape (#sample, #ISE).
-
-        Return:
-            A numpy.ndarray that contains expanded and powered activity of ions
-        with shape (#ISE, #sample, #ISE).
-        """
-        activity_power = chemistry_utils.compute_activity_power(
-            self.charge)
+        activity_power = chemistry_utils.compute_Nikolsky_Eisenman_activity_power(
+            self._charge)
         activity = np.tile(activity, (activity.shape[1],1,1))
         activity = np.power(activity, activity_power)
         return activity
