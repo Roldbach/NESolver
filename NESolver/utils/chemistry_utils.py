@@ -50,7 +50,7 @@ def _compute_activity_coefficient_row(
     charge: np.ndarray,
     ion_size: np.ndarray,
 ) -> float:
-    root_ionic_stregth = np.sqrt(0.5 * concentration_row @ np.power(charge,2).T)
+    root_ionic_strength = np.sqrt(0.5 * concentration_row @ np.power(charge,2).T)
     numerator = -A * np.power(charge,2) * root_ionic_strength
     denominator = 1 + B*root_ionic_strength*ion_size
     activity_coefficient = np.power(10.0, numerator/denominator)

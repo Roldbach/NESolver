@@ -190,7 +190,7 @@ class DataPackSynthesiser:
     # {{{ _compute_Cl_concentration
     def _compute_Cl_concentration(self, concentration: np.ndarray) -> np.ndarray:
         """Build the concentration of Cl ions as the only anions."""
-        Cl_concentration = np.sum(self.charge[0,:-1]*concentration, 1)
+        Cl_concentration = np.sum(self._charge[0,:-1]*concentration, 1)
         Cl_concentration = Cl_concentration.reshape((-1,1))
         return Cl_concentration
     # }}}
@@ -205,7 +205,7 @@ class DataPackSynthesiser:
     def _synthesis_response(self, activity: np.ndarray) -> np.ndarray:
         activity = self._pre_process_activity(activity)
         response = np.log10(activity @ self._selectivity_coefficient)
-        response = self._drift + self._slope*response
+        response = self._response_intercept + self._response_slope*response
         response = np.transpose(response, (1,0,2))
         response = response.reshape((-1, self._sensor_number))
         return response
