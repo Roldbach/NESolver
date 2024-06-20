@@ -1,4 +1,5 @@
-"""A utility module that handles data processing in the project.
+"""A utility module that handles data loading and processing for multivaraite ion
+analysis in the project.
 
 Author: Weixun Luo
 Date: 13/04/2024
@@ -251,13 +252,12 @@ class RegressionAgentDataProcessor(AgentDataProcessor):
 """----- Dataset -----"""
 # {{{ Dataset
 class Dataset(abc.ABC, data.Dataset):
-    """A class that can load processed data for agents in forward/backward
-    solving.
+    """A class that can load and process data for multivariate ion analysis.
     """
     
     # {{{ __init__
     @abc.abstractmethod
-    def __init__(self) -> None:
+    def __init__(self, candidate: np.ndarray, reference: np.ndarray) -> None:
         pass
     # }}}
 
@@ -285,5 +285,18 @@ class Dataset(abc.ABC, data.Dataset):
     @abc.abstractmethod
     def reference(self) -> np.ndarray:
         pass
+    # }}}
+# }}}
+
+# {{{ NumericalAgentForwardDataset
+class NumericalAgentForwardDataset(Dataset):
+    """A class that csan load and process data for multivariate ion analysis with
+    numerical agents.
+    """
+
+    # {{{ __init__
+    def __init__(
+        self,
+        candidate: np.ndarray, reference: np.ndarray) -> None:
     # }}}
 # }}}
