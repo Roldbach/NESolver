@@ -10,7 +10,6 @@ import numpy as np
 from scipy import optimize
 from sklearn import cross_decomposition
 from sklearn import linear_model
-from sklearn import model_selection
 import torch
 from torch import nn
 
@@ -35,12 +34,27 @@ NOVEL_POTENTIAL_SOLVER_PARAMETER = {
 """----- Agent -----"""
 # {{{ Agent
 class Agent(abc.ABC):
-    """An interface that defines an agent that can run forward/backward solving.
+    """An interface that defines an agent that can perform multivariate ion
+    analysis.
     """
 
     # {{{ __init__
     @abc.abstractmethod
     def __init__(self) -> None:
+        pass
+    # }}}
+
+    # {{{ @property: response_intercept
+    @property
+    @abc.abstractmethod
+    def response_intercept(self) -> np.ndarray:
+        pass
+    # }}}
+
+    # {{{ @property: response_slope
+    @property
+    @abc.abstractmethod
+    def response_slope(self) -> np.ndarray:
         pass
     # }}}
 
@@ -51,20 +65,6 @@ class Agent(abc.ABC):
         pass
     # }}}
 
-    # {{{ @property: slope
-    @property
-    @abc.abstractmethod
-    def slope(self) -> np.ndarray:
-        pass
-    # }}}
-
-    # {{{ @property: drift
-    @property
-    @abc.abstractmethod
-    def drift(self) -> np.ndarray:
-        pass
-    # }}}
-
     # {{{ forward_solve
     @abc.abstractmethod
     def forward_solve(self, concentration: np.ndarray) -> np.ndarray:
@@ -73,29 +73,20 @@ class Agent(abc.ABC):
 
     # {{{ backward_solve
     @abc.abstractmethod
-    def backward_solve(
-        self, potential: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def backward_solve(self, response: np.ndarray) -> np.ndarray:
         pass
     # }}}
 # }}}
 
 # {{{ TrainableAgent
 class TrainableAgent(nn.Module, Agent):
-    """An interface that defines an agent that can be trained."""
+    """An interface that defines an agent that can be trained to perform
+    multivariate ion analysis.
+    """
 
     # {{{ forward
     @abc.abstractmethod
     def forward(self, candidate: torch.Tensor) -> torch.Tensor:
-        pass
-    # }}}
-
-    # {{{ infer
-    @abc.abstractmethod
-    def infer(
-        self,
-        candidate: np.ndarray,
-        reference: np.ndarray,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
         pass
     # }}}
 
@@ -109,131 +100,6 @@ class TrainableAgent(nn.Module, Agent):
     @abc.abstractmethod
     def save_weight(self, weight_file_path: str) -> None:
         pass
-    # }}}
-# }}}
-
-
-"""----- Artificial Neural Network -----"""
-# {{{ NeuralNetwork
-class NeuralNetwork(nn.Module):
-    """A class that can predict ion concentrations through deep learning."""
-
-    # {{{ __init__
-    def __init__(self, sensor_number: int) -> None:
-        super().__init__()
-        self._layer = nn.Sequential(
-            nn.Linear(sensor_number, sensor_number).double(),
-            nn.Sigmoid(),
-            nn.Linear(sensor_number, sensor_number).double(),
-            nn.Sigmoid(),
-            nn.Linear(sensor_number, sensor_number).double(),
-        )
-    # }}}
-
-    # {{{ forward
-    def forward(self, candidate: torch.Tensor) -> torch.Tensor:
-        return self._layer(candidate)
-    # }}}
-# }}}
-
-# {{{ NeuralNetworkAgent
-class NeuralNetworkAgent(TrainableAgent):
-    """An agent that can run backward solving through deep learning."""
-
-    # {{{ __init__
-    def __init__(self, charge: np.ndarray, ion_size: np.ndarray) -> None:
-        super().__init__()
-        self._charge = self._construct_charge(charge)
-        self._ion_size = self._construct_ion_size(ion_size)
-        self._neural_network = self._construct_neural_network()
-        self._data_processor = self._construct_data_processor()
-    # }}}
-
-    # {{{ _construct_charge
-    def _construct_charge(self, charge: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(charge)
-    # }}}
-
-    # {{{ _construct_ion_size
-    def _construct_ion_size(self, ion_size: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(ion_size)
-    # }}}
-
-    # {{{ _construct_neural_network
-    def _construct_neural_network(self) -> NeuralNetwork:
-        return NeuralNetwork(self._charge.shape[1])
-    # }}}
-    
-    # {{{ _construct_data_processor
-    def _construct_data_processor(
-        self) -> data_processing_utils.NeuralNetworkAgentDataProcessor:
-        return data_processing_utils.NeuralNetworkAgentDataProcessor()
-    # }}}
-
-    # {{{ selectivity_coefficient
-    @property
-    def selectivity_coefficient(self) -> None:
-        pass
-    # }}}
-
-    # {{{ slope
-    @property
-    def slope(self) -> None:
-        pass
-    # }}}
-
-    # {{{ drift
-    @property
-    def drift(self) -> None:
-        pass
-    # }}}
-
-    # {{{ forward_solve
-    def forward_solve(self, concentration: np.ndarray) -> np.ndarray:
-        pass
-    # }}}
-
-    # {{{ backward_solve
-    def backward_solve(
-        self, potential: np.ndarray) -> np.ndarray:
-        potential = self._data_processor.pre_process_candidate_backward(potential)
-        with torch.no_grad():
-            concentration = self._neural_network(potential)
-        concentration = self._data_processor.post_process_prediction_backward(
-            concentration)
-        activity = chemistry_utils.convert_concentration_to_activity(
-            concentration, self._charge, self._ion_size)
-        return activity, concentration
-    # }}}
-
-    # {{{ forward
-    def forward(self, candidate: torch.Tensor) -> torch.Tensor:
-        return self._neural_network(candidate)
-    # }}}
-
-    # {{{ infer
-    def infer(
-        self,
-        candidate: np.ndarray,
-        reference: np.ndarray,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        candidate = self._data_processor.pre_process_candidate_backward(
-            candidate)
-        reference = self._data_processor.pre_process_reference_backward(
-            reference)
-        prediction = self._neural_network(candidate)
-        return prediction, reference
-    # }}}
-
-    # {{{ load_weight
-    def load_weight(self, weight_file_path: str) -> None:
-        self._neural_network = io_utils.load_state_dictionary(
-            weight_file_path, self._neural_network)
-    # }}}
-
-    # {{{ save_weight
-    def save_weight(self, weight_file_path: str) -> None:
-        io_utils.save_state_dictionary(self._neural_network, weight_file_path)
     # }}}
 # }}}
 
@@ -768,20 +634,6 @@ class NumericalAgent(TrainableAgent):
         return self._potential_solver(candidate)
     # }}}
 
-    # {{{ infer
-    def infer(
-        self,
-        candidate: np.ndarray,
-        reference: np.ndarray,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        candidate = self._data_processor.pre_process_candidate_forward(
-            candidate)
-        reference = self._data_processor.pre_process_reference_forward(
-            reference)
-        prediction = self._potential_solver(candidate)
-        return prediction, reference
-    # }}}
-
     # {{{ load_weight
     def load_weight(self, weight_file_path: str) -> None:
         self._potential_solver = io_utils.load_state_dictionary(
@@ -823,14 +675,26 @@ class NovelNumericalAgent(NumericalAgent):
 """----- Regression -----"""
 # {{{ RegressionAgent
 class RegressionAgent(Agent):
-    """A class that can run forward/backward solving based on regression."""
+    """An Agent that can perform multivariate ion analysis using regression."""
 
     # {{{ __init__
     def __init__(self) -> None:
+        self._response_intercept = None
+        self._response_slope = None
         self._selectivity_coefficient = None
         self._selectivity_coefficient_pseudo_inverse = None
-        self._slope = None
-        self._drift = None
+    # }}}
+
+    # {{{ @property: response_intercept
+    @property
+    def response_intercept(self) -> np.ndarray:
+        return matrix_utils.build_row_array(self._response_intercept)
+    # }}}
+
+    # {{{ @property: response_slope
+    @property
+    def response_slope(self) -> np.ndarray:
+        return matrix_utils.build_row_array(self._response_slope)
     # }}}
 
     # {{{ @property: selectivity_coefficient
@@ -839,46 +703,33 @@ class RegressionAgent(Agent):
         return matrix_utils.build_array(self._selectivity_coefficient)
     # }}}
 
-    # {{{ @property: slope
-    @property
-    def slope(self) -> np.ndarray:
-        return matrix_utils.build_array(self._slope)
-    # }}}
-
-    # {{{ @property: drift
-    @property
-    def drift(self) -> np.ndarray:
-        return matrix_utils.build_array(self._drift)
-    # }}}
-
     # {{{ forward_solve
     def forward_solve(self, concentration: np.ndarray) -> np.ndarray:
-        potential = np.log10(concentration @ self._selectivity_coefficient.T)
-        potential = self._drift + self._slope*potential
-        return potential
+        response = np.log10(concentration @ self._selectivity_coefficient.T)
+        response = self._response_intercept + self._response_slope*response
+        return response
     # }}}
 
     # {{{ backward_solve
-    def backward_solve(self, potential: np.ndarray) -> np.ndarray:
-        potential = np.power(10, (potential-self._drift)/self._slope)
-        concentration = potential @ self._selectivity_coefficient_pseudo_inverse
+    def backward_solve(self, response: np.ndarray) -> np.ndarray:
+        response = (response-self._response_intercept) / self._response_slope
+        response = np.power(10, response)
+        concentration = response @ self._selectivity_coefficient_pseudo_inverse
         return concentration
     # }}}
 
     # {{{ calibrate
-    def calibrate(
-        self, concentration: np.ndarray, potential: np.ndarray) -> None:
-        self._slope, self._drift = self._calibrate_slope_and_drift(
-            concentration, potential)
+    def calibrate(self, concentration: np.ndarray, response: np.ndarray) -> None:
+        self._calibrate_response_intercept_and_slope(concentration, response)
         self._selectivity_coefficient = self._calibrate_selectivity_coefficient(
-            concentration, potential)
+            concentration, response)
         self._selectivity_coefficient_pseudo_inverse = np.linalg.pinv(
             self._selectivity_coefficient.T)
     # }}}
 
-    # {{{ _calibrate_slope_and_drift
-    def _calibrate_slope_and_drift(
-        self, concentration: np.ndarray, potential: np.ndarray) -> None:
+    # {{{ _calibrate_response_intercept_and_slope
+    def _calibrate_response_intercept_and_slope(
+        self, concentration: np.ndarray, response: np.ndarray) -> None:
         slope = matrix_utils.build_zeros_array((1, concentration.shape[1]))
         drift = matrix_utils.build_zeros_array((1, concentration.shape[1]))
         concentration = np.log10(concentration)
