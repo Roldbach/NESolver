@@ -19,6 +19,13 @@ FLOAT_TORCH = torch.float64
 
 
 """----- Array -----"""
+# {{{ add_gaussian_noise_array
+def add_gaussian_noise_array(
+    candidate: np.ndarray, parameter: tuple[float, float]) -> np.ndarray:
+    candidate += np.random.normal(*parameter, candidate.shape)
+    return candidate
+# }}}
+
 # {{{ build_array
 def build_array(
     element: typing.Any, data_type: np.dtype = FLOAT_NUMPY) -> np.ndarray:
