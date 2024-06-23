@@ -675,14 +675,15 @@ class NovelNumericalAgent(NumericalAgent):
 """----- Regression -----"""
 # {{{ RegressionAgent
 class RegressionAgent(Agent):
-    """An Agent that can perform multivariate ion analysis using regression."""
+    """An Agent that can perform multivariate ion analysis based on regression.
+    """
 
     # {{{ __init__
     def __init__(self) -> None:
         self._response_intercept = None
         self._response_slope = None
         self._selectivity_coefficient = None
-        self._selectivity_coefficient_pseudo_inverse = None
+        self._selectivity_coefficient_transpose_pseudo_inverse = None
     # }}}
 
     # {{{ @property: response_intercept
@@ -721,50 +722,52 @@ class RegressionAgent(Agent):
     # {{{ calibrate
     def calibrate(self, concentration: np.ndarray, response: np.ndarray) -> None:
         self._calibrate_response_intercept_and_slope(concentration, response)
-        self._selectivity_coefficient = self._calibrate_selectivity_coefficient(
-            concentration, response)
-        self._selectivity_coefficient_pseudo_inverse = np.linalg.pinv(
-            self._selectivity_coefficient.T)
+        self._calibrate_selectivity_coefficient(concentration, response)
+        self._calibrate_selectivity_coefficient_transpose_pseudo_inverse()
     # }}}
 
     # {{{ _calibrate_response_intercept_and_slope
     def _calibrate_response_intercept_and_slope(
         self, concentration: np.ndarray, response: np.ndarray) -> None:
-        slope = matrix_utils.build_zeros_array((1, concentration.shape[1]))
-        drift = matrix_utils.build_zeros_array((1, concentration.shape[1]))
+        self._response_intercept = matrix_utils.build_zeros_array(
+            (1, concentration.shape[1]))
+        self._response_slope = matrix_utils.build_zeros_array(
+            (1, concentration.shape[1]))
         concentration = np.log10(concentration)
         for i in range(concentration.shape[1]):
-            slope[0,i], drift[0,i] = self._calibrate_slope_and_drift_single(
-                concentration[:,i], potential[:,i])
-        return slope, drift
+            self._response_intercept[0,i], self._response_slope[0,i] = self._compute_response_intercept_and_slope_single(
+                concentration[:,i], response[:,i])
     # }}}
 
-    # {{{ _calibrate_slope_and_drift_single
-    def _calibrate_slope_and_drift_single(
-        self, concentration_column: np.ndarray, potential_column: np.ndarray,
+    # {{{ _compute_response_intercept_and_slope_single
+    def _compute_response_intercept_and_slope_single(
+        self, concentration_column: np.ndarray, response_column: np.ndarray,
     ) -> tuple[float,float]:
         pass
     # }}}
 
     # {{{ _calibrate_selectivity_coefficient
     def _calibrate_selectivity_coefficient(
-        self, concentration: np.ndarray, potential: np.ndarray) -> None:
-        selectivity_coefficient = matrix_utils.build_zeros_array(
+        self, concentration: np.ndarray, response: np.ndarray) -> None:
+        self._selectivity_coefficient = matrix_utils.build_zeros_array(
             (concentration.shape[1], concentration.shape[1]))
-        potential = np.power(10, (potential-self._drift)/self._slope)
+        response = np.power(10, (response-self._response_intercept)/self._response_slope)
         for i in range(concentration.shape[1]):
-            selectivity_coefficient[i,:] = self._calibrate_selectivity_coefficient_single(
-                concentration, potential[:,i])
-        return selectivity_coefficient
+            self._selectivity_coefficient[i,:] = self._compute_selectivity_coefficient_single(
+                concentration, response[:,i])
     # }}}
 
-    # {{{ _calibrate_selectivity_coefficient_single
-    def _calibrate_selectivity_coefficient_single(
-        self,
-        concentration: np.ndarray,
-        potential_column: np.ndarray,
+    # {{{ _compute_selectivity_coefficient_single
+    def _compute_selectivity_coefficient_single(
+        self, concentration: np.ndarray, response_column: np.ndarray,
     ) -> np.ndarray:
         pass
+    # }}}
+
+    # {{{ _calibrate_selectivity_coefficient_transpose_pseudo_inverse
+    def _calibrate_selectivity_coefficient_transpose_pseudo_inverse(self) -> None:
+        self._selectivity_coefficient_transpose_pseudo_inverse = np.linalg.pinv(
+            self._selectivity_coefficient.T)
     # }}}
 # }}}
 
@@ -779,9 +782,9 @@ class BayesianRegressionAgent(RegressionAgent):
         super().__init__()
     # }}}
 
-    # {{{ _calibrate_slope_and_drift_single
-    def _calibrate_slope_and_drift_single(
-        self, concentration_column: np.ndarray, potential_column: np.ndarray,
+    # {{{ _compute_response_intercept_and_slope_single
+    def _compute_response_intercept_and_slope_single(
+        self, concentration_column: np.ndarray, response_column: np.ndarray,
     ) -> tuple[float,float]:
         grid_searcher = model_selection.GridSearchCV(
             estimator = linear_model.BayesianRidge(),
@@ -797,18 +800,18 @@ class BayesianRegressionAgent(RegressionAgent):
             scoring = 'neg_mean_squared_error',
             n_jobs = -1,
         )
-        grid_searcher.fit(concentration_column.reshape((-1,1)), potential_column)
+        grid_searcher.fit(concentration_column.reshape((-1,1)), response_column)
         return (
-            grid_searcher.best_estimator_.coef_,
             grid_searcher.best_estimator_.intercept_,
+            grid_searcher.best_estimator_.coef_,
         )
     # }}}
 
-    # {{{ _calibrate_selectivity_coefficient_single
-    def _calibrate_selectivity_coefficient_single(
+    # {{{ _compute_selectivity_coefficient_single
+    def _compute_selectivity_coefficient_single(
         self,
         concentration: np.ndarray,
-        potential_column: np.ndarray,
+        response_column: np.ndarray,
     ) -> np.ndarray:
         grid_searcher = model_selection.GridSearchCV(
             estimator = linear_model.BayesianRidge(),
@@ -824,7 +827,7 @@ class BayesianRegressionAgent(RegressionAgent):
             scoring = 'neg_mean_squared_error',
             n_jobs = -1,
         )
-        grid_searcher.fit(concentration, potential_column)
+        grid_searcher.fit(concentration, response_column)
         return grid_searcher.best_estimator_.coef_ 
     # }}}
 # }}}
@@ -840,23 +843,23 @@ class OrdinaryRegressionAgent(RegressionAgent):
         super().__init__()
     # }}}
 
-    # {{{ _calibrate_slope_and_drift_single
-    def _calibrate_slope_and_drift_single(
-        self, concentration_column: np.ndarray, potential_column: np.ndarray,
+    # {{{ _compute_response_intercept_and_slope_single
+    def _compute_response_intercept_and_slope_single(
+        self, concentration_column: np.ndarray, response_column: np.ndarray,
     ) -> tuple[float,float]:
         regressor = linear_model.LinearRegression(fit_intercept=True)
-        regressor.fit(concentration_column.reshape((-1,1)), potential_column)
-        return regressor.coef_, regressor.intercept_
+        regressor.fit(concentration_column.reshape((-1,1)), response_column)
+        return regressor.intercept_, regressor.coef_
     # }}}
 
-    # {{{ _calibrate_selectivity_coefficient_single
-    def _calibrate_selectivity_coefficient_single(
+    # {{{ _compute_selectivity_coefficient_single
+    def _compute_selectivity_coefficient_single(
         self,
         concentration: np.ndarray,
-        potential_column: np.ndarray,
+        response_column: np.ndarray,
     ) -> np.ndarray:
         regressor = linear_model.LinearRegression(fit_intercept=False)
-        regressor.fit(concentration, potential_column)
+        regressor.fit(concentration, response_column)
         return regressor.coef_
     # }}}
 # }}}
@@ -872,21 +875,21 @@ class PartialRegressionAgent(RegressionAgent):
         super().__init__()
     # }}}
 
-    # {{{ _calibrate_slope_and_drift_single
-    def _calibrate_slope_and_drift_single(
-        self, concentration_column: np.ndarray, potential_column: np.ndarray,
+    # {{{ _compute_response_intercept_and_slope_single
+    def _compute_response_intercept_and_slope_single(
+        self, concentration_column: np.ndarray, response_column: np.ndarray,
     ) -> tuple[float,float]:
         regressor = cross_decomposition.PLSRegression(
             n_components=1, scale=False, max_iter=1000)
-        regressor.fit(concentration_column.reshape((-1,1)), potential_column)
-        return regressor.coef_, regressor.intercept_
+        regressor.fit(concentration_column.reshape((-1,1)), response_column)
+        return regressor.intercept_, regressor.coef_
     # }}}
 
-    # {{{ _calibrate_selectivity_coefficient_single
-    def _calibrate_selectivity_coefficient_single(
+    # {{{ _compute_selectivity_coefficient_single
+    def _compute_selectivity_coefficient_single(
         self,
         concentration: np.ndarray,
-        potential_column: np.ndarray,
+        response_column: np.ndarray,
     ) -> np.ndarray:
         grid_searcher = model_selection.GridSearchCV(
             estimator = cross_decomposition.PLSRegression(),
@@ -898,7 +901,7 @@ class PartialRegressionAgent(RegressionAgent):
             scoring = 'neg_mean_squared_error',
             n_jobs = -1,
         )
-        grid_searcher.fit(concentration, potential_column)
+        grid_searcher.fit(concentration, response_column)
         return grid_searcher.best_estimator_.coef_
     # }}}
 # }}}
