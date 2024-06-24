@@ -679,11 +679,28 @@ class RegressionAgent(Agent):
     """
 
     # {{{ __init__
-    def __init__(self) -> None:
-        self._response_intercept = None
-        self._response_slope = None
-        self._selectivity_coefficient = None
-        self._selectivity_coefficient_transpose_pseudo_inverse = None
+    def __init__(self, sensor_number: int) -> None:
+        self._response_intercept = self._construct_response_intercept(
+            sensor_number)
+        self._response_slope = self._construct_response_slope(sensor_number)
+        self._selectivity_coefficient = self._construct_selectivity_coefficient(
+            sensor_number)
+    # }}}
+
+    # {{{ _construct_response_intercept
+    def _construct_response_intercept(self, sensor_number: int) -> np.ndarray:
+        return matrix_utils.build_zeros_array((1, sensor_number))
+    # }}}
+
+    # {{{ _construct_response_slope
+    def _construct_response_slope(self, sensor_number: int) -> np.ndarray:
+        return matrix_utils.build_zeros_array((1, sensor_number))
+    # }}}
+
+    # {{{ _construct_selectivity_coefficient
+    def _construct_selectivity_coefficient(
+        self, sensor_number: int) -> np.ndarray:
+        return matrix_utils.build_zeros_array((sensor_number, sensor_number))
     # }}}
 
     # {{{ @property: response_intercept
@@ -715,7 +732,7 @@ class RegressionAgent(Agent):
     def backward_solve(self, response: np.ndarray) -> np.ndarray:
         response = (response-self._response_intercept) / self._response_slope
         response = np.power(10, response)
-        concentration = response @ self._selectivity_coefficient_pseudo_inverse
+        concentration = response @ np.linalg.pinv(self._selectivity_coefficient.T)
         return concentration
     # }}}
 
@@ -723,16 +740,11 @@ class RegressionAgent(Agent):
     def calibrate(self, concentration: np.ndarray, response: np.ndarray) -> None:
         self._calibrate_response_intercept_and_slope(concentration, response)
         self._calibrate_selectivity_coefficient(concentration, response)
-        self._calibrate_selectivity_coefficient_transpose_pseudo_inverse()
     # }}}
 
     # {{{ _calibrate_response_intercept_and_slope
     def _calibrate_response_intercept_and_slope(
         self, concentration: np.ndarray, response: np.ndarray) -> None:
-        self._response_intercept = matrix_utils.build_zeros_array(
-            (1, concentration.shape[1]))
-        self._response_slope = matrix_utils.build_zeros_array(
-            (1, concentration.shape[1]))
         concentration = np.log10(concentration)
         for i in range(concentration.shape[1]):
             self._response_intercept[0,i], self._response_slope[0,i] = self._compute_response_intercept_and_slope_single(
@@ -741,7 +753,9 @@ class RegressionAgent(Agent):
 
     # {{{ _compute_response_intercept_and_slope_single
     def _compute_response_intercept_and_slope_single(
-        self, concentration_column: np.ndarray, response_column: np.ndarray,
+        self,
+        concentration_column: np.ndarray,
+        response_column: np.ndarray,
     ) -> tuple[float,float]:
         pass
     # }}}
@@ -749,9 +763,8 @@ class RegressionAgent(Agent):
     # {{{ _calibrate_selectivity_coefficient
     def _calibrate_selectivity_coefficient(
         self, concentration: np.ndarray, response: np.ndarray) -> None:
-        self._selectivity_coefficient = matrix_utils.build_zeros_array(
-            (concentration.shape[1], concentration.shape[1]))
-        response = np.power(10, (response-self._response_intercept)/self._response_slope)
+        response = np.power(
+            10, (response-self._response_intercept)/self._response_slope)
         for i in range(concentration.shape[1]):
             self._selectivity_coefficient[i,:] = self._compute_selectivity_coefficient_single(
                 concentration, response[:,i])
@@ -759,15 +772,11 @@ class RegressionAgent(Agent):
 
     # {{{ _compute_selectivity_coefficient_single
     def _compute_selectivity_coefficient_single(
-        self, concentration: np.ndarray, response_column: np.ndarray,
+        self,
+        concentration: np.ndarray,
+        response_column: np.ndarray,
     ) -> np.ndarray:
         pass
-    # }}}
-
-    # {{{ _calibrate_selectivity_coefficient_transpose_pseudo_inverse
-    def _calibrate_selectivity_coefficient_transpose_pseudo_inverse(self) -> None:
-        self._selectivity_coefficient_transpose_pseudo_inverse = np.linalg.pinv(
-            self._selectivity_coefficient.T)
     # }}}
 # }}}
 
@@ -778,8 +787,8 @@ class BayesianRegressionAgent(RegressionAgent):
     """
 
     # {{{ __init__
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, sensor_number: int) -> None:
+        super().__init__(sensor_number)
     # }}}
 
     # {{{ _compute_response_intercept_and_slope_single
@@ -839,14 +848,16 @@ class OrdinaryRegressionAgent(RegressionAgent):
     """
 
     # {{{ __init__
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, sensor_number: int) -> None:
+        super().__init__(sensor_number)
     # }}}
 
     # {{{ _compute_response_intercept_and_slope_single
     def _compute_response_intercept_and_slope_single(
-        self, concentration_column: np.ndarray, response_column: np.ndarray,
-    ) -> tuple[float,float]:
+        self,
+        concentration_column: np.ndarray,
+        response_column: np.ndarray,
+    ) -> tuple[float, float]:
         regressor = linear_model.LinearRegression(fit_intercept=True)
         regressor.fit(concentration_column.reshape((-1,1)), response_column)
         return regressor.intercept_, regressor.coef_
@@ -871,13 +882,15 @@ class PartialRegressionAgent(RegressionAgent):
     """
 
     # {{{ __init__
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, sensor_number: int) -> None:
+        super().__init__(sensor_number)
     # }}}
 
     # {{{ _compute_response_intercept_and_slope_single
     def _compute_response_intercept_and_slope_single(
-        self, concentration_column: np.ndarray, response_column: np.ndarray,
+        self,
+        concentration_column: np.ndarray,
+        response_column: np.ndarray,
     ) -> tuple[float,float]:
         regressor = cross_decomposition.PLSRegression(
             n_components=1, scale=False, max_iter=1000)
