@@ -427,38 +427,6 @@ class AgentTrainingPipeline:
     # }}}
 # }}}
 
-# {{{ NeuralNetworkAgentTrainingPipeline
-class NeuralNetworkAgentTrainingPipeline(AgentTrainingPipeline):
-    """A pipeline that trains a NeuralNetworkAgent to run backward solving."""
-
-    # {{{ __init__
-    def __init__(
-        self,
-        charge: np.ndarray,
-        ion_size: np.ndarray,
-        concentration: np.ndarray,
-        potential: np.ndarray,
-        slice_training: slice,
-        slice_validation: slice,
-        learning_rate: float,
-        optimiser_class: optim.Optimizer,
-        criterion_class: nn.Module,
-    ) -> None:
-        super().__init__(
-            optimisation_utils.NeuralNetworkAgent,
-            charge,
-            ion_size,
-            potential,
-            concentration,
-            slice_training,
-            slice_validation,
-            learning_rate,
-            optimiser_class,
-            criterion_class,
-        )
-    # }}}
-# }}}
-
 # {{{ VanillaNumericalAgentTrainingPipeline
 class VanillaNumericalAgentTrainingPipeline(AgentTrainingPipeline):
     """A pipeline that trains a VanillaNumericalAgent to run forward solving."""
@@ -542,28 +510,40 @@ class NovelNumericalAgentTrainingPipeline(AgentTrainingPipeline):
 """----- Evaluation -----"""
 # {{{ AgentEvaluationPipeline
 class AgentEvaluationPipeline:
-    """A pipeline that evaluates the trained agent."""
+    """A pipeline that evaluates the performance of agent in multivariate ion
+    analysis.
+    """
 
     # {{{ __init__
     def __init__(
         self,
         agent: optimisation_utils.Agent,
+        response_intercept: np.ndarray,
+        response_slope: np.ndarray,
         selectivity_coefficient: np.ndarray,
-        slope: np.ndarray,
-        drift: np.ndarray,
         concentration: np.ndarray,
-        activity: np.ndarray,
-        potential: np.ndarray,
+        response: np.ndarray,
     ) -> None:
         self._agent = agent
+        self._response_intercept = self._construct_response_intercept(
+            response_intercept)
+        self._response_slope = self._construct_response_slope(response_slope)
         self._selectivity_coefficient = self._construct_selectivity_coefficient(
             selectivity_coefficient)
-        self._slope = self._construct_slope(slope)
-        self._drift = self._construct_drift(drift)
         self._concentration = self._construct_concentration(concentration)
-        self._activity = self._construct_activity(activity)
-        self._potential = self._construct_potential(potential)
+        self._response = self._construct_response(response)
         self._evaluation_outcome = self._construct_evaluation_outcome()
+    # }}}
+
+    # {{{ _construct_response_intercept
+    def _construct_response_intercept(
+        self, response_intercept: np.ndarray) -> np.ndarray:
+        return matrix_utils.build_row_array(response_intercept)
+    # }}}
+
+    # {{{ _construct_response_slope
+    def _construct_response_slope(self, response_slope: np.ndarray) -> np.ndarray:
+        return matrix_utils.build_row_array(response_slope)
     # }}}
 
     # {{{ _construct_selectivity_coefficient
@@ -572,29 +552,14 @@ class AgentEvaluationPipeline:
         return matrix_utils.build_array(selectivity_coefficient)
     # }}}
 
-    # {{{ _construct_slope
-    def _construct_slope(self, slope: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(slope)
-    # }}}
-
-    # {{{ _construct_drift
-    def _construct_drift(self, drift: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(drift)
-    # }}}
-
     # {{{ _construct_concentration
     def _construct_concentration(self, concentration: np.ndarray) -> np.ndarray:
         return matrix_utils.build_array(concentration)
     # }}}
 
-    # {{{ _construct_activity
-    def _construct_activity(self, activity: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(activity)
-    # }}}
-
-    # {{{ _construct_potential
-    def _construct_potential(self, potential: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(potential)
+    # {{{ _construct_response
+    def _construct_response(self, response: np.ndarray) -> np.ndarray:
+        return matrix_utils.build_array(response)
     # }}}
 
     # {{{ _construct_evaluation_outcome
@@ -613,11 +578,11 @@ class AgentEvaluationPipeline:
         return self._evaluation_outcome
     # }}}
 
-    # {{{ _evaluate_drift
-    def _evaluate_drift(self) -> None:
-        self._evaluation_outcome['drift']['sensor_wise_error'] = evaluation_utils.compute_absolute_percentage_error(
+    # {{{ _evaluate_response_intercept
+    def _evaluate_response_intercept(self) -> None:
+        self._evaluation_outcome['response_intercept']['sensor_wise_error'] = evaluation_utils.compute_absolute_percentage_error(
             self._agent.drift, self._drift).flatten()
-        self._evaluation_outcome['drift']['overall_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
+        self._evaluation_outcome['response_intercept']['overall_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
             self._agent.drift, self._drift)
         self._evaluation_outcome['drift']['is_numerically_close'] = evaluation_utils.is_numerically_close(
             self._agent.drift, self._drift).flatten()
@@ -747,106 +712,5 @@ class AgentEvaluationPipeline:
         #print(f'- Is statistically close? {self._evaluation_outcome["concentration"]["is_statistically_close"].flatten().tolist()}')
         #print(f'- Is checked by t-test? {is_difference_normal.flatten().tolist()}')
         print('')
-    # }}}
-# }}}
-
-# {{{ NeuralNetworkAgentEvaluationPipeline
-class NeuralNetworkAgentEvaluationPipeline(AgentEvaluationPipeline):
-    """A pipeline that evaluates the trained NeuralNetworkAgent."""
-
-    # {{{ __init__
-    def __init__(
-        self,
-        agent: optimisation_utils.NeuralNetwork,
-        selectivity_coefficient: np.ndarray,
-        slope: np.ndarray,
-        drift: np.ndarray,
-        concentration: np.ndarray,
-        activity: np.ndarray,
-        potential: np.ndarray,
-    ) -> None:
-        super().__init__(
-            agent,
-            selectivity_coefficient,
-            slope,
-            drift,
-            concentration,
-            activity,
-            potential,
-        )
-    # }}}
-
-    # {{{ _evaluate_selectivity_coefficient
-    def _evaluate_selectivity_coefficient(self) -> None:
-        pass
-    # }}}
-
-    # {{{ _evaluate_slope
-    def _evaluate_slope(self) -> None:
-        pass
-    # }}}
-
-    # {{{ _evaluate_drift
-    def _evaluate_drift(self) -> None:
-        pass
-    # }}}
-
-    # {{{ _evaluate_potential
-    def _evaluate_potential(self) -> None:
-        pass
-    # }}}
-# }}}
-
-# {{{ RegressonAgentEvaluationPipeline
-class RegressionAgentEvaluationPipeline(AgentEvaluationPipeline):
-    """A pipeline that evaluates the calibrated RegressionAgent."""
-
-    # {{{ __init__
-    def __init__(
-        self,
-        agent: optimisation_utils.Agent,
-        selectivity_coefficient: np.ndarray,
-        slope: np.ndarray,
-        drift: np.ndarray,
-        concentration: np.ndarray,
-        activity: np.ndarray,
-        potential: np.ndarray,
-    ) -> None:
-        super().__init__(
-            agent,
-            selectivity_coefficient,
-            slope,
-            drift,
-            concentration,
-            activity,
-            potential,
-        )
-    # }}}
-# }}}
-
-# {{{ NumericalAgentEvaluationPipeline
-class NumericalAgentEvaluationPipeline(AgentEvaluationPipeline):
-    """A pipeline that evaluates the trained NumericalAgent."""
-
-    # {{{ __init__
-    def __init__(
-        self,
-        agent: optimisation_utils.NumericalAgent,
-        selectivity_coefficient: np.ndarray,
-        slope: np.ndarray,
-        drift: np.ndarray,
-        concentration: np.ndarray,
-        activity: np.ndarray,
-        potential: np.ndarray,
-    ) -> None:
-        super().__init__(
-            agent,
-            selectivity_coefficient,
-            slope,
-            drift,
-            concentration,
-            activity,
-            potential,
-        )
     # }}}
 # }}}
