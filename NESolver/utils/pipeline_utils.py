@@ -3,7 +3,6 @@
 Author: Weixun Luo
 Date: 03/04/2024
 """
-import collections
 import functools
 import sys
 import time
@@ -510,7 +509,7 @@ class NovelNumericalAgentTrainingPipeline(AgentTrainingPipeline):
 """----- Evaluation -----"""
 # {{{ AgentEvaluationPipeline
 class AgentEvaluationPipeline:
-    """A pipeline that evaluates the performance of agent in multivariate ion
+    """A pipeline that evaluates the agent performance in multivariate ion
     analysis.
     """
 
@@ -532,7 +531,6 @@ class AgentEvaluationPipeline:
             selectivity_coefficient)
         self._concentration = self._construct_concentration(concentration)
         self._response = self._construct_response(response)
-        self._evaluation_outcome = self._construct_evaluation_outcome()
     # }}}
 
     # {{{ _construct_response_intercept
@@ -562,59 +560,79 @@ class AgentEvaluationPipeline:
         return matrix_utils.build_array(response)
     # }}}
 
-    # {{{ _construct_evaluation_outcome
-    def _construct_evaluation_outcome(self) -> collections.defaultdict:
-        return collections.defaultdict(dict)
-    # }}}
-
     # {{{ evaluate
     def evaluate(self) -> collections.defaultdict:
         print('##### Evaluation #####')
-        self._evaluate_drift()
-        self._evaluate_slope()
+        self._evaluate_forward_accuracy()
+        self._evaluate_backward_accuracy()
+        self._evaluate_response_intercept()
+        self._evaluate_response_slope()
         self._evaluate_selectivity_coefficient()
-        self._evaluate_potential()
-        self._evaluate_concentration()
-        return self._evaluation_outcome
     # }}}
 
-    # {{{ _evaluate_response_intercept
-    def _evaluate_response_intercept(self) -> None:
-        self._evaluation_outcome['response_intercept']['sensor_wise_error'] = evaluation_utils.compute_absolute_percentage_error(
-            self._agent.drift, self._drift).flatten()
-        self._evaluation_outcome['response_intercept']['overall_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
-            self._agent.drift, self._drift)
-        self._evaluation_outcome['drift']['is_numerically_close'] = evaluation_utils.is_numerically_close(
-            self._agent.drift, self._drift).flatten()
-        error_sensor_wise = format_utils.format_scientific_array(
-            self._evaluation_outcome['drift']['sensor_wise_error'])
-        error_overall = format_utils.format_scientific_value(
-            self._evaluation_outcome['drift']['overall_error'])
-        print('##### Response Intercept #####')
-        print(f'- Derived: {self._agent.drift.flatten().tolist()}')
-        print(f'- True: {self._drift.flatten().tolist()}')
-        print(f'- Is numerically close? {self._evaluation_outcome["drift"]["is_numerically_close"].tolist()}')
+    # {{{ _evaluate_forward_accuracy
+    def _evaluate_forward_accuracy(self) -> None:
+        response = self._agent.forward_solve(self._concentration)
+        error_sensor_wise = evaluation_utils.compute_mean_absolute_percentage_error(
+            response, self._response, 0)
+        error_sensor_wise = format_utils.format_scientific_array(error_sensor_wise)
+        error_overall = evaluation_utils.compute_mean_absolute_percentage_error(
+            response, self._response)
+        error_overall = format_utils.format_scientific_value(error_overall)
+        print('##### Forward Accuracy (Sensor Response) #####')
         print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
         print(f'- Overall Percentage Error (%): {error_overall}')
         print('')
     # }}}
 
-    # {{{ _evaluate_slope
-    def _evaluate_slope(self) -> None:
-        self._evaluation_outcome['slope']['sensor_wise_error'] = evaluation_utils.compute_absolute_error(
-            self._agent.slope, self._slope).flatten()
-        self._evaluation_outcome['slope']['overall_error'] = evaluation_utils.compute_mean_absolute_error(
+    # {{{ _evaluate_backward_accuracy
+    def _evaluate_backward_accuracy(self) -> None:
+        concentration = self._agent.backward_solve(self._response)
+        error_sensor_wise = evaluation_utils.compute_mean_absolute_percentage_error(
+            concentration, self._concentration, 0)
+        error_sensor_wise = format_utils.format_scientific_array(error_sensor_wise)
+        error_overall = evaluation_utils.compute_mean_absolute_percentage_error(
+            concentration, self._concentration)
+        error_overall = format_utils.format_scientific_value(error_overall)
+        print('##### Backward Accuracy (Ion Concentration) #####')
+        print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
+        print(f'- Overall Percentage Error (%): {error_overall}')
+        print('')
+    # }}}
+
+    # {{{ _evaluate_response_intercept
+    def _evaluate_response_intercept(self) -> None:
+        is_numerically_close = evaluation_utils.is_numerically_close(
+            self._agent.drift, self._drift)
+        error_sensor_wise = evaluation_utils.compute_absolute_percentage_error(
+            self._agent.response_intercept, self._response_intercept)
+        error_sensor_wise = format_utils.format_scientific_array(error_sensor_wise)
+        error_overall = evaluation_utils.compute_mean_absolute_percentage_error(
+            self._agent.response_intercept, self._response_intercept)
+        error_overall = format_utils.format_scientific_value(error_overall)
+        print('##### Response Intercept #####')
+        print(f'- Derived: {self._agent.drift.flatten().tolist()}')
+        print(f'- True: {self._drift.flatten().tolist()}')
+        print(f'- Is numerically close? {is_numerically_close.flatten().tolist()}')
+        print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
+        print(f'- Overall Percentage Error (%): {error_overall}')
+        print('')
+    # }}}
+
+    # {{{ _evaluate_response_slope
+    def _evaluate_response_slope(self) -> None:
+        is_numerically_close = evaluation_utils.is_numerically_close(
+            self._agent.response_slope, self._response_slope)
+        error_sensor_wise = evaluation_utils.compute_absolute_percentage_error(
+            self._agent.response_slope, self._response_slope)
+        error_sensor_wise = format_utils.format_scientific_array(error_sensor_wise)
+        error_overall = evaluation_utils.compute_mean_absolute_percentage_error(
             self._agent.slope, self._slope)
-        self._evaluation_outcome['slope']['is_numerically_close'] = evaluation_utils.is_numerically_close(
-            self._agent.slope, self._slope).flatten()
-        error_sensor_wise = format_utils.format_scientific_array(
-            self._evaluation_outcome['slope']['sensor_wise_error'])
-        error_overall = format_utils.format_scientific_value(
-            self._evaluation_outcome['slope']['overall_error'])
+        error_overall = format_utils.format_scientific_value(error_overall)
         print('##### Response Slope #####')
         print(f'- Derived: {self._agent.slope.flatten().tolist()}')
         print(f'- True: {self._slope.flatten().tolist()}')
-        print(f'- Is numerically close? {self._evaluation_outcome["slope"]["is_numerically_close"].tolist()}')
+        print(f'- Is numerically close? {is_numerically_close.flatten().tolist()}')
         print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
         print(f'- Overall Percentage Error (%): {error_overall}')
         print('')
@@ -622,95 +640,26 @@ class AgentEvaluationPipeline:
 
     # {{{ _evaluate_selectivity_coefficient
     def _evaluate_selectivity_coefficient(self) -> None:
-        self._evaluation_outcome['selectivity_coefficient']['sensor_wise_error'] = evaluation_utils.compute_mean_absolute_error(
+        is_numerically_close = evaluation_utils.is_numerically_close(
+            self._agent.selectivity_coefficient, self._selectivity_coefficient)
+        error_sensor_wise = evaluation_utils.compute_mean_absolute_error(
             self._agent.selectivity_coefficient,
             self._selectivity_coefficient,
             axis = 1,
         )
-        self._evaluation_outcome['selectivity_coefficient']['overall_error'] = evaluation_utils.compute_mean_absolute_error(
-            self._agent.selectivity_coefficient,
-            self._selectivity_coefficient,
-        )
-        self._evaluation_outcome['selectivity_coefficient']['is_numerically_close'] = evaluation_utils.is_numerically_close(
-            self._agent.selectivity_coefficient,
-            self._selectivity_coefficient,
-        )
-        error_sensor_wise = format_utils.format_scientific_array(
-            self._evaluation_outcome['selectivity_coefficient']['sensor_wise_error'])
-        error_overall = format_utils.format_scientific_value(
-            self._evaluation_outcome['selectivity_coefficient']['overall_error'])
+        error_sensor_wise = format_utils.format_scientific_array(error_sensor_wise)
+        error_overall = evaluation_utils.compute_mean_absolute_error(
+            self._agent.selectivity_coefficient, self._selectivity_coefficient)
+        error_overall = format_utils.format_scientific_value(error_overall)
         print('##### Selectivity Coefficient #####')
         print('- Derived:')
         print(self._agent.selectivity_coefficient)
         print('- True:')
         print(self._selectivity_coefficient)
         print('- Is numerically close?')
-        print(self._evaluation_outcome['selectivity_coefficient']['is_numerically_close'])
+        print(is_numerically_close)
         print(f'- Sensor-wise L1 Error (a.u.): {error_sensor_wise}')
         print(f'- Overall L1 Error (a.u.): {error_overall}')
-        print('')
-    # }}}
-
-    # {{{ _evaluate_potential
-    def _evaluate_potential(self) -> None:
-        potential = self._agent.forward_solve(self._concentration)
-        self._evaluation_outcome['potential']['sensor_wise_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
-            potential, self._potential, 0).flatten()
-        self._evaluation_outcome['potential']['overall_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
-            potential, self._potential)
-        error_sensor_wise = format_utils.format_scientific_array(
-            self._evaluation_outcome['potential']['sensor_wise_error'])
-        error_overall = format_utils.format_scientific_value(
-            self._evaluation_outcome['potential']['overall_error'])
-        #self._evaluation_outcome['potential']['is_statistically_close'], is_difference_normal = evaluation_utils.is_statistically_close(
-            #potential, self._potential)
-        print('##### Forward Accuracy (Sensor Response) #####')
-        print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
-        print(f'- Overall Percentage Error (%): {error_overall}')
-        #print(f'- Is statistically close? {self._evaluation_outcome["potential"]["is_statistically_close"].flatten().tolist()}')
-        #print(f'- Is checked by t-test? {is_difference_normal.flatten().tolist()}')
-        print('')
-    # }}}
-
-    # {{{ _evaluate_activity
-    def _evaluate_activity(self) -> None:
-        activity, _ = self._agent.backward_solve(self._potential)
-        self._evaluation_outcome['activity']['sensor_wise_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
-            activity, self._activity, 0).flatten()
-        self._evaluation_outcome['activity']['overall_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
-            activity, self._activity)
-        self._evaluation_outcome['activity']['is_statistically_close'], is_difference_normal = evaluation_utils.is_statistically_close(
-            activity, self._activity)
-        error_sensor_wise = format_utils.format_scientific_array(
-            self._evaluation_outcome['activity']['sensor_wise_error'])
-        error_overall = format_utils.format_scientific_value(
-            self._evaluation_outcome['activity']['overall_error'])
-        print('##### Backward Accuracy - Activity #####')
-        print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
-        print(f'- Overall Percentage Error (%): {error_overall}')
-        print(f'- Is statistically close? {self._evaluation_outcome["activity"]["is_statistically_close"].flatten().tolist()}')
-        print(f'- Is checked by t-test? {is_difference_normal.flatten().tolist()}')
-        print('')
-    # }}}
-
-    # {{{ _evaluate_concentration
-    def _evaluate_concentration(self) -> None:
-        concentration = self._agent.backward_solve(self._potential)
-        self._evaluation_outcome['concentration']['sensor_wise_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
-            concentration, self._concentration, 0).flatten()
-        self._evaluation_outcome['concentration']['overall_error'] = evaluation_utils.compute_mean_absolute_percentage_error(
-            concentration, self._concentration)
-        #self._evaluation_outcome['concentration']['is_statistically_close'], is_difference_normal = evaluation_utils.is_statistically_close(
-            #concentration, self._concentration)
-        error_sensor_wise = format_utils.format_scientific_array(
-            self._evaluation_outcome['concentration']['sensor_wise_error'])
-        error_overall = format_utils.format_scientific_value(
-            self._evaluation_outcome['concentration']['overall_error'])
-        print('##### Backward Accuracy (Ion Concentration) #####')
-        print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
-        print(f'- Overall Percentage Error (%): {error_overall}')
-        #print(f'- Is statistically close? {self._evaluation_outcome["concentration"]["is_statistically_close"].flatten().tolist()}')
-        #print(f'- Is checked by t-test? {is_difference_normal.flatten().tolist()}')
         print('')
     # }}}
 # }}}

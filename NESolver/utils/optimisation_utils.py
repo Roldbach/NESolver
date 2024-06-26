@@ -675,8 +675,7 @@ class NovelNumericalAgent(NumericalAgent):
 """----- Regression -----"""
 # {{{ RegressionAgent
 class RegressionAgent(Agent):
-    """An Agent that can perform multivariate ion analysis based on regression.
-    """
+    """An Agent that performs multivariate ion analysis based on regression."""
 
     # {{{ __init__
     def __init__(self, sensor_number: int) -> None:
