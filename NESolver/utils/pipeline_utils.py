@@ -3,6 +3,7 @@
 Author: Weixun Luo
 Date: 03/04/2024
 """
+import collections
 import functools
 import sys
 import time
@@ -17,8 +18,6 @@ from torch import optim
 from torchmetrics import regression
 
 from NESolver.utils import chemistry_utils
-from NESolver.utils import data_processing_utils
-from NESolver.utils import data_simulation_utils
 from NESolver.utils import evaluation_utils
 from NESolver.utils import format_utils
 from NESolver.utils import io_utils
@@ -507,8 +506,8 @@ class NovelNumericalAgentTrainingPipeline(AgentTrainingPipeline):
 
 
 """----- Evaluation -----"""
-# {{{ AgentEvaluationPipeline
-class AgentEvaluationPipeline:
+# {{{ EvaluationPipeline
+class EvaluationPipeline:
     """A pipeline that evaluates the agent performance in multivariate ion
     analysis.
     """
@@ -603,7 +602,7 @@ class AgentEvaluationPipeline:
     # {{{ _evaluate_response_intercept
     def _evaluate_response_intercept(self) -> None:
         is_numerically_close = evaluation_utils.is_numerically_close(
-            self._agent.drift, self._drift)
+            self._agent.response_intercept, self._response_intercept)
         error_sensor_wise = evaluation_utils.compute_absolute_percentage_error(
             self._agent.response_intercept, self._response_intercept)
         error_sensor_wise = format_utils.format_scientific_array(error_sensor_wise)
@@ -611,8 +610,8 @@ class AgentEvaluationPipeline:
             self._agent.response_intercept, self._response_intercept)
         error_overall = format_utils.format_scientific_value(error_overall)
         print('##### Response Intercept #####')
-        print(f'- Derived: {self._agent.drift.flatten().tolist()}')
-        print(f'- True: {self._drift.flatten().tolist()}')
+        print(f'- Derived: {self._agent.response_intercept.flatten().tolist()}')
+        print(f'- True: {self._response_intercept.flatten().tolist()}')
         print(f'- Is numerically close? {is_numerically_close.flatten().tolist()}')
         print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
         print(f'- Overall Percentage Error (%): {error_overall}')
@@ -627,11 +626,11 @@ class AgentEvaluationPipeline:
             self._agent.response_slope, self._response_slope)
         error_sensor_wise = format_utils.format_scientific_array(error_sensor_wise)
         error_overall = evaluation_utils.compute_mean_absolute_percentage_error(
-            self._agent.slope, self._slope)
+            self._agent.response_slope, self._response_slope)
         error_overall = format_utils.format_scientific_value(error_overall)
         print('##### Response Slope #####')
-        print(f'- Derived: {self._agent.slope.flatten().tolist()}')
-        print(f'- True: {self._slope.flatten().tolist()}')
+        print(f'- Derived: {self._agent.response_slope.flatten().tolist()}')
+        print(f'- True: {self._response_slope.flatten().tolist()}')
         print(f'- Is numerically close? {is_numerically_close.flatten().tolist()}')
         print(f'- Sensor-wise Percentage Error (%): {error_sensor_wise}')
         print(f'- Overall Percentage Error (%): {error_overall}')

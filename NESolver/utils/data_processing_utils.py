@@ -298,5 +298,6 @@ class NumericalAgentForwardDataset(Dataset):
     def __init__(
         self,
         candidate: np.ndarray, reference: np.ndarray) -> None:
+        pass
     # }}}
 # }}}

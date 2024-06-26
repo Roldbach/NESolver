@@ -10,6 +10,7 @@ import numpy as np
 from scipy import optimize
 from sklearn import cross_decomposition
 from sklearn import linear_model
+from sklearn import model_selection
 import torch
 from torch import nn
 
@@ -892,7 +893,7 @@ class PartialRegressionAgent(RegressionAgent):
         response_column: np.ndarray,
     ) -> tuple[float,float]:
         regressor = cross_decomposition.PLSRegression(
-            n_components=1, scale=False, max_iter=1000)
+            n_components=1, scale=True, max_iter=1000)
         regressor.fit(concentration_column.reshape((-1,1)), response_column)
         return regressor.intercept_, regressor.coef_
     # }}}
@@ -907,7 +908,7 @@ class PartialRegressionAgent(RegressionAgent):
             estimator = cross_decomposition.PLSRegression(),
             param_grid = {
                 'n_components': [i for i in range(1,concentration.shape[1]+1)],
-                'scale': [False],
+                'scale': [True],
                 'max_iter': [1000],
             },
             scoring = 'neg_mean_squared_error',
