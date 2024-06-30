@@ -27,14 +27,6 @@ from NESolver.utils import optimisation_utils
 from NESolver.utils import typing_utils
 
 
-HYPERPARAMETER_SPACE = {
-    'max_epochs': [1000],
-    'lr': [1e-3, 1e-4, 1e-5],
-    'optimizer': [optim.Adam],
-    'criterion': [nn.MSELoss, regression.MeanSquaredLogError],
-}
-
-
 """----- Timing -----"""
 # {{{ timer
 class timer:
@@ -147,28 +139,43 @@ class HyperparameterSearchPipeline:
     # {{{ __init__
     def __init__(
         self,
-        agent_class: nn.Module,
         charge: np.ndarray,
         ion_size: np.ndarray,
-        activity: np.ndarray,
-        potential: np.ndarray,
-        hyperparameter_space: dict = HYPERPARAMETER_SPACE,
+        concentration: np.ndarray,
+        response: np.ndarray,
+        hyperparameter_space: dict = {
+            'max_epochs': [1000],
+            'lr': [1e-3, 1e-4, 1e-5],
+            'optimizer': [optim.Adam],
+            'criterion': [nn.MSELoss, regression.MeanSquaredLogError],
+        },
     ) -> None:
-        self._dataset = self._construct_dataset(charge, activity, potential)
-        self._grid = self._construct_grid(
-            agent_class, charge, ion_size, hyperparameter_space)
+        self._dataset = self._construct_dataset(
+            charge, ion_size, concentration, response)
+        self._grid = self._construct_grid(charge, ion_size, hyperparameter_space)
+    # }}}
+
+    # {{{ _construct_dataset
+    def _construct_dataset(
+        self,
+        charge: np.ndarray,
+        ion_size: np.ndarray,
+        concentration: np.ndarray,
+        response: np.ndarray,
+    ) -> data_utils.OptimisationAgentForwardDataset:
+        return data_utils.OptimisationAgentForwardDataset(
+            charge, ion_size, concentration, response)
     # }}}
 
     # {{{ _construct_grid
     def _construct_grid(
         self,
-        agent_class: nn.Module,
         charge: np.ndarray,
         ion_size: np.ndarray,
         hyperparameter_space: dict,
     ) -> model_selection.GridSearchCV:
         return model_selection.GridSearchCV(
-            estimator = self._build_estimator(agent_class, charge, ion_size),
+            estimator = self._build_estimator(charge, ion_size),
             param_grid = hyperparameter_space,
             scoring = self._build_score_function(),
             refit = False,
@@ -180,12 +187,11 @@ class HyperparameterSearchPipeline:
     # {{{ _build_estimator
     def _build_estimator(
         self,
-        agent_class: nn.Module,
         charge: np.ndarray,
         ion_size: np.ndarray,
     ) -> net.NeuralNet:
         return net.NeuralNet(
-            module = agent_class,
+            module = optimisation_utils.OptimisationAgent,
             module__charge = charge,
             module__ion_size = ion_size,
             criterion = None,
@@ -217,24 +223,31 @@ class HyperparameterSearchPipeline:
     @timer()
     def search(self) -> typing_utils.Hyperparameter:
         print('##### Hyperparameter Grid Search #####')
-        hyperparameter_optimal, score_optimal = self._search()
-        self._print_search_outcome(hyperparameter_optimal, score_optimal)
-        return hyperparameter_optimal
+        search_outcome = self._search()
+        self._format_search_outcome(search_outcome)
+        self._print_search_outcome(search_outcome)
+        return search_outcome.best_params_
     # }}}
 
     # {{{ _search
     def _search(self) -> tuple[dict, float]:
-        search_outcome = self._grid.fit(
-            self._dataset.activity, self._dataset.potential)
-        return search_outcome.best_params_, search_outcome.best_score_
+        return self._grid.fit(self._dataset.candidate, self._dataset.reference)
+    # }}}
+
+    # {{{ _format_search_outcome
+    def _format_search_outcome(self, search_outcome: typing.Any) -> None:
+        search_outcome.best_params_['learning_rate'] = search_outcome.best_params_.pop('lr')
+        search_outcome.best_params_['optimiser_class'] = search_outcome.best_params_.pop('optimizer')
+        search_outcome.best_params_['criterion_class'] = search_outcome.best_params_.pop('criterion')
+        search_outcome.best_params_.pop('max_epochs')
     # }}}
 
     # {{{ _print_search_outcome
-    def _print_search_outcome(
-        self, hyperparameter_optimal: dict, score_optimal: float) -> None:
-        score_optimal = format_utils.format_scientific_value(score_optimal)
+    def _print_search_outcome(self, search_outcome: typing.Any) -> None:
+        score_optimal = format_utils.format_scientific_value(
+            search_outcome.best_score_)
         print('- Optimal Hyperparameter')
-        for name, parameter in hyperparameter_optimal.items():
+        for name, parameter in search_outcome.best_params_.items():
             print(f'\t - {name}: {parameter}')
         print(f'- Optimal L2 Score: {score_optimal}')
     # }}}
@@ -242,7 +255,7 @@ class HyperparameterSearchPipeline:
 
 
 """----- Training -----"""
-# {{{ TrainingPipline
+# {{{ TrainingPipeline
 class TrainingPipeline:
     """A pipeline that trains an agent to fit the underlying parameters of ISEs.
     """
