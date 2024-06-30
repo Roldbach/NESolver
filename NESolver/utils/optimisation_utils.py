@@ -20,13 +20,6 @@ from NESolver.utils import io_utils
 from NESolver.utils import matrix_utils
 
 
-NOVEL_POTENTIAL_SOLVER_PARAMETER = {
-    'selectivity_coefficient': 'eye',
-    'slope': 'nernst',
-    'drift': 'Ag/AgCl',
-}
-
-
 """----- Agent -----"""
 # {{{ Agent
 class Agent(abc.ABC):
@@ -101,24 +94,37 @@ class TrainableAgent(nn.Module, Agent):
 
 
 """----- Optimisation -----"""
-# {{{ NumericalAgent
-class NumericalAgent(TrainableAgent):
-    """An agent that can run forward/backward solving through numerical solving."""
+# {{{ OptimisationAgent
+class OptimisationAgent(TrainableAgent):
+    """An Agent that performs multivariate ion analysis based on optimisation and
+    numerically solving equations.
+    """
 
     # {{{ __init__
-    def __init__(
-        self,
-        charge: np.ndarray,
-        ion_size: np.ndarray,
-        potential_solver_class: PotentialSolver,
-    ) -> None:
+    def __init__(self, charge: np.ndarray, ion_size: np.ndarray) -> None:
         super().__init__()
+        self._charge = self._construct_charge(charge)
+        self._ion_size = self._construct_ion_size(ion_size)
+        self._activity_power = self._construct_activity_power()
         self._activity_solver = self._construct_activity_solver(charge)
         self._activity_coefficient_solver = self._construct_activity_coefficient_solver(
             charge, ion_size)
-        self._potential_solver = self._construct_potential_solver(
-            charge, potential_solver_class)
-        self._data_processor = self._construct_data_processor(charge, ion_size)
+        self._response_solver = self._construct_response_solver(charge)
+    # }}}
+
+    # {{{ _construct_charge
+    def _construct_charge(self, charge: np.ndarray) -> np.ndarray:
+        return matrix_utils.build_array(charge)
+    # }}}
+
+    # {{{ _construct_ion_size
+    def _construct_ion_size(self, ion_size: np.ndarray) -> np.ndarray:
+        return matrix_utils.build_array(ion_size)
+    # }}}
+
+    # {{{ _construct_activity_power
+    def _construct_activity_power(self) -> np.ndarray:
+        return chemistry_utils.compute_activity_power(self._charge)
     # }}}
 
     # {{{ _construct_activity_solver
@@ -133,22 +139,21 @@ class NumericalAgent(TrainableAgent):
         return ActivityCoefficientSolver(charge, ion_size)
     # }}}
 
-    # {{{ _construct_potential_solver
-    def _construct_potential_solver(
-        self,
-        charge: np.ndarray,
-        potential_solver_class: PotentialSolver,
-    ) -> PotentialSolver:
-        return potential_solver_class(charge)
+    # {{{ _construct_response_solver
+    def _construct_response_solver(self, charge: np.ndarray) -> ResponseSolver:
+        return ResponseSolver(charge)
     # }}}
 
-    # {{{ _construct_data_processor
-    def _construct_data_processor(
-        self,
-        charge: np.ndarray,
-        ion_size: np.ndarray,
-    ) -> data_processing_utils.NumericalAgentDataProcessor:
-        return data_processing_utils.NumericalAgentDataProcessor(charge, ion_size)
+    # {{{ @property: response_intercept
+    @property
+    def response_intercept(self) -> np.ndarray:
+        return self._response_solver.response_intercept
+    # }}}
+
+    # {{{ @property: response_slope
+    @property
+    def response_slope(self) -> np.ndarray:
+        return self._response_solver.response_slope
     # }}}
 
     # {{{ @property: selectivity_coefficient
@@ -157,71 +162,66 @@ class NumericalAgent(TrainableAgent):
         return self._potential_solver.selectivity_coefficient
     # }}}
 
-    # {{{ @property: slope
-    @property
-    def slope(self) -> np.ndarray:
-        return self._potential_solver.slope
-    # }}}
-
-    # {{{ @property: drift
-    @property
-    def drift(self) -> np.ndarray:
-        return self._potential_solver.drift
-    # }}}
-
     # {{{ forward_solve
     def forward_solve(self, concentration: np.ndarray) -> np.ndarray:
-        activity = self._data_processor.pre_process_candidate_forward(
-            concentration)
-        self._potential_solver.eval()
+        activity = self._pre_process_concentration_forward(concentration)
+        self._response_solver.eval()
         with torch.no_grad():
-            potential = self._potential_solver(activity)
-        potential = self._data_processor.post_process_prediction_forward(potential)
-        return potential
+            response = self._response_solver(activity)
+        response = response.numpy().squeeze()
+        return response
+    # }}}
+
+    # {{{ _pre_process_concentration_forward
+    def _pre_process_concentration_forward(
+        self, concentration: np.ndarray) -> torch.Tensor:
+        activity = chemistry_utils.convert_concentration_to_activity(
+            concentration, self._charge, self._ion_size)
+        for _ in range(2):
+            activity = np.expand_dims(activity, 1)
+        activity = np.tile(activity, (1,activity.shape[3],1,1))
+        activity = np.power(activity, self._activity_power)
+        activity = matrix_utils.build_tensor(activity)
+        return activity
     # }}}
 
     # {{{ backward_solve
-    def backward_solve(
-        self, potential: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        potential = self._data_processor.pre_process_candidate_backward(
-            potential, self._potential_solver.slope, self._potential_solver.drift)
+    def backward_solve(self, response: np.ndarray) -> np.ndarray:
+        response = self._pre_process_response_backward(response)
         activity = self._activity_solver.solve(
-            potential, self._potential_solver.selectivity_coefficient)
-        activity_coefficient = self._activity_coefficient_solver.solve(
-            activity)
+            response, self._response_solver.selectivity_coefficient)
+        activity_coefficient = self._activity_coefficient_solver.solve(activity)
         concentration = activity / activity_coefficient
         return concentration
     # }}}
 
+    # {{{ _pre_process_response_backward
+    def _pre_process_response_backward(self, response: np.ndarray) -> np.ndarray:
+        response = response - self._response_solver.response_intercept
+        response = response * self._response_solver.response_slope
+        response = np.power(10, response)
+        return response
+    # }}}
+
     # {{{ forward
     def forward(self, candidate: torch.Tensor) -> torch.Tensor:
-        return self._potential_solver(candidate)
+        return self._response_solver(candidate)
     # }}}
 
     # {{{ load_weight
     def load_weight(self, weight_file_path: str) -> None:
-        self._potential_solver = io_utils.load_state_dictionary(
-            weight_file_path, self._potential_solver)
+        self._response_solver = io_utils.load_state_dictionary(
+            weight_file_path, self._response_solver)
     # }}}
 
     # {{{ save_weight
     def save_weight(self, weight_file_path: str) -> None:
-        io_utils.save_state_dictionary(self._potential_solver, weight_file_path)
-    # }}}
-# }}}
-
-# {{{ NovelNumericalAgent
-class NovelNumericalAgent(NumericalAgent):
-    """An agent that can run forward/backward solving through numerical solving."""
-
-    # {{{ __init__
-    def __init__(self, charge: np.ndarray, ion_size: np.ndarray) -> None:
-        super().__init__(charge, ion_size, NovelPotentialSolver)
+        io_utils.save_state_dictionary(self._response_solver, weight_file_path)
     # }}}
 
     # {{{ clamp_selectivity_coefficient
     def clamp_selectivity_coefficient(self) -> None:
-        self._potential_solver._selectivity_coefficient.data.clamp_min_(0)
+        self._response_solver._selectivity_coefficient.data.clamp_min_(0)
     # }}}
 # }}}
 
@@ -491,9 +491,9 @@ class ResponseSolver(nn.Module):
     def __init__(
         self,
         charge: np.ndarray,
-        response_intercept_initialisation: str,
-        response_slope_initialisation: str,
-        selectivity_coefficient_initialisation: str,
+        response_intercept_initialisation: str = 'Ag/AgCl',
+        response_slope_initialisation: str = 'nernst',
+        selectivity_coefficient_initialisation: str = 'eye',
     ) -> None:
         super().__init__()
         self._sensor_number = self._construct_sensor_number(charge)
@@ -557,31 +557,31 @@ class ResponseSolver(nn.Module):
         return selectivity_coefficient
     # }}}
 
+    # {{{ @property: response_intercept
+    @property
+    def response_intercept(self) -> np.ndarray:
+        return self._response_intercept.clone().detach().numpy().reshape((1,-1))
+    # }}}
+
+    # {{{ @property: response_slope
+    @property
+    def response_slope(self) -> np.ndarray:
+        return self._response_slope.clone().detach().numpy().reshape((1,-1))
+    # }}}
+
     # {{{ @property: selectivity_coefficient
     @property
     def selectivity_coefficient(self) -> np.ndarray:
         selectivity_coefficient = self._selectivity_coefficient.clone().detach().numpy()
         selectivity_coefficient = selectivity_coefficient.reshape(
-            (-1, self._sensor_number))
+            (self._sensor_number, self._sensor_number))
         return selectivity_coefficient
-    # }}}
-
-    # {{{ @property: slope
-    @property
-    def slope(self) -> np.ndarray:
-        return self._slope.data.clone().detach().numpy().reshape((1,-1))
-    # }}}
-
-    # {{{ @property: drift
-    @property
-    def drift(self) -> np.ndarray:
-        return self._drift.data.clone().detach().numpy().reshape((1,-1))
     # }}}
 
     # {{{ forward
     def forward(self, candidate: torch.Tensor) -> torch.Tensor:
         output = torch.log10(candidate @ self._selectivity_coefficient)
-        output = self._drift + self._slope*output
+        output = self._response_intercept + self._response_slope*output
         return output
     # }}}
 # }}}
