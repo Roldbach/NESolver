@@ -15,7 +15,6 @@ import torch
 from torch import nn
 
 from NESolver.utils import chemistry_utils
-from NESolver.utils import data_processing_utils
 from NESolver.utils import io_utils
 from NESolver.utils import matrix_utils
 
@@ -94,137 +93,6 @@ class TrainableAgent(nn.Module, Agent):
 
 
 """----- Optimisation -----"""
-# {{{ OptimisationAgent
-class OptimisationAgent(TrainableAgent):
-    """An Agent that performs multivariate ion analysis based on optimisation and
-    numerically solving equations.
-    """
-
-    # {{{ __init__
-    def __init__(self, charge: np.ndarray, ion_size: np.ndarray) -> None:
-        super().__init__()
-        self._charge = self._construct_charge(charge)
-        self._ion_size = self._construct_ion_size(ion_size)
-        self._activity_power = self._construct_activity_power()
-        self._activity_solver = self._construct_activity_solver(charge)
-        self._activity_coefficient_solver = self._construct_activity_coefficient_solver(
-            charge, ion_size)
-        self._response_solver = self._construct_response_solver(charge)
-    # }}}
-
-    # {{{ _construct_charge
-    def _construct_charge(self, charge: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(charge)
-    # }}}
-
-    # {{{ _construct_ion_size
-    def _construct_ion_size(self, ion_size: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(ion_size)
-    # }}}
-
-    # {{{ _construct_activity_power
-    def _construct_activity_power(self) -> np.ndarray:
-        return chemistry_utils.compute_activity_power(self._charge)
-    # }}}
-
-    # {{{ _construct_activity_solver
-    def _construct_activity_solver(self, charge: np.ndarray) -> ActivitySolver:
-        return ActivitySolver(charge)
-    # }}}
-
-    # {{{ _construct_activity_coefficient_solver
-    def _construct_activity_coefficient_solver(
-        self, charge: np.ndarray, ion_size: np.ndarray,
-    ) -> ActivityCoefficientSolver:
-        return ActivityCoefficientSolver(charge, ion_size)
-    # }}}
-
-    # {{{ _construct_response_solver
-    def _construct_response_solver(self, charge: np.ndarray) -> ResponseSolver:
-        return ResponseSolver(charge)
-    # }}}
-
-    # {{{ @property: response_intercept
-    @property
-    def response_intercept(self) -> np.ndarray:
-        return self._response_solver.response_intercept
-    # }}}
-
-    # {{{ @property: response_slope
-    @property
-    def response_slope(self) -> np.ndarray:
-        return self._response_solver.response_slope
-    # }}}
-
-    # {{{ @property: selectivity_coefficient
-    @property
-    def selectivity_coefficient(self) -> np.ndarray:
-        return self._potential_solver.selectivity_coefficient
-    # }}}
-
-    # {{{ forward_solve
-    def forward_solve(self, concentration: np.ndarray) -> np.ndarray:
-        activity = self._pre_process_concentration_forward(concentration)
-        self._response_solver.eval()
-        with torch.no_grad():
-            response = self._response_solver(activity)
-        response = response.numpy().squeeze()
-        return response
-    # }}}
-
-    # {{{ _pre_process_concentration_forward
-    def _pre_process_concentration_forward(
-        self, concentration: np.ndarray) -> torch.Tensor:
-        activity = chemistry_utils.convert_concentration_to_activity(
-            concentration, self._charge, self._ion_size)
-        for _ in range(2):
-            activity = np.expand_dims(activity, 1)
-        activity = np.tile(activity, (1,activity.shape[3],1,1))
-        activity = np.power(activity, self._activity_power)
-        activity = matrix_utils.build_tensor(activity)
-        return activity
-    # }}}
-
-    # {{{ backward_solve
-    def backward_solve(self, response: np.ndarray) -> np.ndarray:
-        response = self._pre_process_response_backward(response)
-        activity = self._activity_solver.solve(
-            response, self._response_solver.selectivity_coefficient)
-        activity_coefficient = self._activity_coefficient_solver.solve(activity)
-        concentration = activity / activity_coefficient
-        return concentration
-    # }}}
-
-    # {{{ _pre_process_response_backward
-    def _pre_process_response_backward(self, response: np.ndarray) -> np.ndarray:
-        response = response - self._response_solver.response_intercept
-        response = response * self._response_solver.response_slope
-        response = np.power(10, response)
-        return response
-    # }}}
-
-    # {{{ forward
-    def forward(self, candidate: torch.Tensor) -> torch.Tensor:
-        return self._response_solver(candidate)
-    # }}}
-
-    # {{{ load_weight
-    def load_weight(self, weight_file_path: str) -> None:
-        self._response_solver = io_utils.load_state_dictionary(
-            weight_file_path, self._response_solver)
-    # }}}
-
-    # {{{ save_weight
-    def save_weight(self, weight_file_path: str) -> None:
-        io_utils.save_state_dictionary(self._response_solver, weight_file_path)
-    # }}}
-
-    # {{{ clamp_selectivity_coefficient
-    def clamp_selectivity_coefficient(self) -> None:
-        self._response_solver._selectivity_coefficient.data.clamp_min_(0)
-    # }}}
-# }}}
-
 # {{{ ActivitySolver
 class ActivitySolver:
     """A class that inversely solves the ion activity giving the response of ISEs.
@@ -533,7 +401,7 @@ class ResponseSolver(nn.Module):
         weight = matrix_utils.initialise_weight_tensor(
             shape = (self._sensor_number, self._sensor_number),
             initialisation = initialisation,
-        )
+        ).unsqueeze(2)
         selectivity_coefficient = nn.Parameter(weight)
         selectivity_coefficient = self._register_gradient_hook(
             selectivity_coefficient)
@@ -546,6 +414,7 @@ class ResponseSolver(nn.Module):
 
         # {{{ _gradient_hook
         def _gradient_hook(gradient: torch.Tensor) -> torch.Tensor:
+            gradient = gradient.squeeze(2)
             gradient.fill_diagonal_(0.0)
             gradient[-1,:].fill_(0.0)
             gradient[:,-1].fill_(0.0)
@@ -583,6 +452,138 @@ class ResponseSolver(nn.Module):
         output = torch.log10(candidate @ self._selectivity_coefficient)
         output = self._response_intercept + self._response_slope*output
         return output
+    # }}}
+# }}}
+
+# {{{ OptimisationAgent
+class OptimisationAgent(TrainableAgent):
+    """An Agent that performs multivariate ion analysis based on optimisation and
+    numerically solving equations.
+    """
+
+    # {{{ __init__
+    def __init__(self, charge: np.ndarray, ion_size: np.ndarray) -> None:
+        super().__init__()
+        self._charge = self._construct_charge(charge)
+        self._ion_size = self._construct_ion_size(ion_size)
+        self._activity_power = self._construct_activity_power()
+        self._activity_solver = self._construct_activity_solver(charge)
+        self._activity_coefficient_solver = self._construct_activity_coefficient_solver(
+            charge, ion_size)
+        self._response_solver = self._construct_response_solver(charge)
+    # }}}
+
+    # {{{ _construct_charge
+    def _construct_charge(self, charge: np.ndarray) -> np.ndarray:
+        return matrix_utils.build_array(charge)
+    # }}}
+
+    # {{{ _construct_ion_size
+    def _construct_ion_size(self, ion_size: np.ndarray) -> np.ndarray:
+        return matrix_utils.build_array(ion_size)
+    # }}}
+
+    # {{{ _construct_activity_power
+    def _construct_activity_power(self) -> np.ndarray:
+        return chemistry_utils.compute_Nikolsky_Eisenman_activity_power(
+            self._charge)
+    # }}}
+
+    # {{{ _construct_activity_solver
+    def _construct_activity_solver(self, charge: np.ndarray) -> ActivitySolver:
+        return ActivitySolver(charge)
+    # }}}
+
+    # {{{ _construct_activity_coefficient_solver
+    def _construct_activity_coefficient_solver(
+        self, charge: np.ndarray, ion_size: np.ndarray,
+    ) -> ActivityCoefficientSolver:
+        return ActivityCoefficientSolver(charge, ion_size)
+    # }}}
+
+    # {{{ _construct_response_solver
+    def _construct_response_solver(self, charge: np.ndarray) -> ResponseSolver:
+        return ResponseSolver(charge)
+    # }}}
+
+    # {{{ @property: response_intercept
+    @property
+    def response_intercept(self) -> np.ndarray:
+        return self._response_solver.response_intercept
+    # }}}
+
+    # {{{ @property: response_slope
+    @property
+    def response_slope(self) -> np.ndarray:
+        return self._response_solver.response_slope
+    # }}}
+
+    # {{{ @property: selectivity_coefficient
+    @property
+    def selectivity_coefficient(self) -> np.ndarray:
+        return self._response_solver.selectivity_coefficient
+    # }}}
+
+    # {{{ forward_solve
+    def forward_solve(self, concentration: np.ndarray) -> np.ndarray:
+        activity = self._pre_process_concentration_forward(concentration)
+        self._response_solver.eval()
+        with torch.no_grad():
+            response = self._response_solver(activity)
+        response = response.numpy().squeeze()
+        return response
+    # }}}
+
+    # {{{ _pre_process_concentration_forward
+    def _pre_process_concentration_forward(
+        self, concentration: np.ndarray) -> torch.Tensor:
+        activity = chemistry_utils.convert_concentration_to_activity(
+            concentration, self._charge, self._ion_size)
+        for _ in range(2):
+            activity = np.expand_dims(activity, 1)
+        activity = np.tile(activity, (1,activity.shape[3],1,1))
+        activity = np.power(activity, self._activity_power)
+        activity = matrix_utils.build_tensor(activity)
+        return activity
+    # }}}
+
+    # {{{ backward_solve
+    def backward_solve(self, response: np.ndarray) -> np.ndarray:
+        response = self._pre_process_response_backward(response)
+        activity = self._activity_solver.solve(
+            response, self._response_solver.selectivity_coefficient)
+        activity_coefficient = self._activity_coefficient_solver.solve(activity)
+        concentration = activity / activity_coefficient
+        return concentration
+    # }}}
+
+    # {{{ _pre_process_response_backward
+    def _pre_process_response_backward(self, response: np.ndarray) -> np.ndarray:
+        response = response - self._response_solver.response_intercept
+        response = response / self._response_solver.response_slope
+        response = np.power(10, response)
+        return response
+    # }}}
+
+    # {{{ forward
+    def forward(self, candidate: torch.Tensor) -> torch.Tensor:
+        return self._response_solver(candidate)
+    # }}}
+
+    # {{{ load_weight
+    def load_weight(self, weight_file_path: str) -> None:
+        self._response_solver = io_utils.load_state_dictionary(
+            weight_file_path, self._response_solver)
+    # }}}
+
+    # {{{ save_weight
+    def save_weight(self, weight_file_path: str) -> None:
+        io_utils.save_state_dictionary(self._response_solver, weight_file_path)
+    # }}}
+
+    # {{{ clamp_selectivity_coefficient
+    def clamp_selectivity_coefficient(self) -> None:
+        self._response_solver._selectivity_coefficient.data.clamp_min_(0)
     # }}}
 # }}}
 

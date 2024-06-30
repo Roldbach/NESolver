@@ -18,6 +18,7 @@ from torch import optim
 from torchmetrics import regression
 
 from NESolver.utils import chemistry_utils
+from NESolver.utils import data_utils
 from NESolver.utils import evaluation_utils
 from NESolver.utils import format_utils
 from NESolver.utils import io_utils
@@ -26,12 +27,6 @@ from NESolver.utils import optimisation_utils
 from NESolver.utils import typing_utils
 
 
-EARLY_STOPPER_PARAMETER = {
-    'patience': 1000,
-    'delta': 0.0,
-    'checkpoint_file_path': '.checkpoint.pth',
-}
-EPOCH_OUTCOME_LIMIT = 15  # The number of lines that can be seen in terminal
 HYPERPARAMETER_SPACE = {
     'max_epochs': [1000],
     'lr': [1e-3, 1e-4, 1e-5],
@@ -99,9 +94,9 @@ class EarlyStopper:
     # {{{ __init__
     def __init__(
         self,
-        patience = EARLY_STOPPER_PARAMETER['patience'],
-        delta = EARLY_STOPPER_PARAMETER['delta'],
-        checkpoint_file_path = EARLY_STOPPER_PARAMETER['checkpoint_file_path'],
+        patience: int = 1000,
+        delta: float = 0.0,
+        checkpoint_file_path: str = '.checkpoint.pth',
     ) -> None:
         self._patience = patience
         self._delta = delta
@@ -245,58 +240,40 @@ class HyperparameterSearchPipeline:
     # }}}
 # }}}
 
-# {{{ SolverHyperparameterSearchPipeline
-class SolverHyperparameterSearchPipeline(HyperparameterSearchPipeline):
-    """A pipeline that can search optimal hyperparameters for Solver training."""
-
-    # {{{ __init__
-    def __init__(
-        self,
-        agent_class: optimisation_utils.NumericalAgent,
-        charge: np.ndarray,
-        ion_size: np.ndarray,
-        activity: np.ndarray,
-        potential: np.ndarray,
-        hyperparameter_space: dict = HYPERPARAMETER_SPACE,
-    ) -> None:
-        super().__init__(
-            agent_class,
-            charge,
-            ion_size,
-            activity,
-            potential,
-            hyperparameter_space,
-        )
-    # }}}
-# }}}
-
 
 """----- Training -----"""
-# {{{ AgentTrainingPipline
-class AgentTrainingPipeline:
+# {{{ TrainingPipline
+class TrainingPipeline:
     """A pipeline that trains an agent to fit the underlying parameters of ISEs.
     """
 
     # {{{ __init__
     def __init__(
         self,
-        agent_class: typing.Callable,
         charge: np.ndarray,
         ion_size: np.ndarray,
-        candidate: np.ndarray,
-        reference: np.ndarray,
+        concentration: np.ndarray,
+        response: np.ndarray,
         slice_training: slice,
         slice_validation: slice,
         learning_rate: float,
         optimiser_class: optim.Optimizer,
         criterion_class: nn.Module,
-        epoch_outcome_limit: int = EPOCH_OUTCOME_LIMIT,
+        epoch_outcome_limit: int = 15,
     ) -> None:
-        self._agent = self._construct_agent(agent_class, charge, ion_size)
-        self._candidate = self._construct_candidate(candidate)
-        self._reference = self._construct_reference(reference)
-        self._slice_training = slice_training
-        self._slice_validation = slice_validation
+        self._agent = self._construct_agent(charge, ion_size)
+        self._data_loader_training = self._construct_data_loader(
+            charge,
+            ion_size,
+            concentration[slice_training,...],
+            response[slice_training,...],
+        )
+        self._data_loader_validation = self._construct_data_loader(
+            charge,
+            ion_size,
+            concentration[slice_validation,...],
+            response[slice_validation,...],
+        )
         self._optimiser = self._construct_optimiser(
             optimiser_class, learning_rate)
         self._criterion = self._construct_criterion(criterion_class)
@@ -305,26 +282,28 @@ class AgentTrainingPipeline:
         self._early_stopper = self._construct_early_stopper()
         self._epoch_outcome_deque = self._construct_epoch_outcome_deque(
             epoch_outcome_limit)
+        self._epoch_outcome_limit = epoch_outcome_limit
     # }}}
 
     # {{{ _construct_agent
     def _construct_agent(
         self,
-        agent_class: typing.Callable,
         charge: np.ndarray,
         ion_size: np.ndarray,
-    ) -> optimisation_utils.TrainableAgent:
-        return agent_class(charge, ion_size)
+    ) -> optimisation_utils.OptimisationAgent:
+        return optimisation_utils.OptimisationAgent(charge, ion_size)
     # }}}
 
-    # {{{ _construct_candidate
-    def _construct_candidate(self, candidate: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(candidate)
-    # }}}
-
-    # {{{ _construct_reference
-    def _construct_reference(self, reference: np.ndarray) -> np.ndarray:
-        return matrix_utils.build_array(reference)
+    # {{{ _construct_data_loader
+    def _construct_data_loader(
+        self,
+        charge: np.ndarray,
+        ion_size: np.ndarray,
+        concentration: np.ndarray,
+        response: np.ndarray,
+    ) -> data_utils.OptimisationAgentForwardDataLoader:
+        return data_utils.OptimisationAgentForwardDataLoader(
+            charge, ion_size, concentration, response)
     # }}}
 
     # {{{ _construct_optimiser
@@ -372,28 +351,50 @@ class AgentTrainingPipeline:
 
     # {{{ _train
     def _train(self) -> None:
+        training_loss = 0.0
         self._agent.train()
-        prediction, reference = self._agent.infer(
-            self._candidate[self._slice_training,:],
-            self._reference[self._slice_training,:],
-        )
-        training_loss = self._criterion(prediction, reference)
-        training_loss.backward()
+        for candidate_batch, reference_batch in self._data_loader_training:
+            training_loss += self._train_batch(candidate_batch, reference_batch)
+        self._training_loss_all.append(
+            training_loss / len(self._data_loader_training))
+    # }}}
+
+    # {{{ _train_batch
+    def _train_batch(
+        self,
+        candidate_batch: torch.Tensor,
+        reference_batch: torch.Tensor,
+    ) -> float:
+        prediction_batch = self._agent(candidate_batch)
+        training_loss_batch = self._criterion(prediction_batch, reference_batch)
+        training_loss_batch.backward()
         self._optimiser.step()
         self._optimiser.zero_grad()
-        self._training_loss_all.append(training_loss.item())
+        self._agent.clamp_selectivity_coefficient()
+        return training_loss_batch.item()
     # }}}
 
     # {{{ _validate
-    def _validate(self) -> float:
+    def _validate(self) -> None:
+        validation_loss = 0.0
         self._agent.eval()
         with torch.no_grad():
-            prediction, reference = self._agent.infer(
-                self._candidate[self._slice_validation,:],
-                self._reference[self._slice_validation,:],
-            )
-            validation_loss = self._criterion(prediction, reference)
-        self._validation_loss_all.append(validation_loss.item())
+            for candidate_batch, reference_batch in self._data_loader_validation:
+                validation_loss += self._validate_batch(
+                    candidate_batch, reference_batch)
+        self._validation_loss_all.append(
+            validation_loss / len(self._data_loader_validation))
+    # }}}
+
+    # {{{ _validate_batch
+    def _validate_batch(
+        self,
+        candidate_batch: torch.Tensor,
+        reference_batch: torch.Tensor,
+    ) -> float:
+        prediction_batch = self._agent(candidate_batch)
+        validation_loss_batch = self._criterion(prediction_batch, reference_batch)
+        return validation_loss_batch.item()
     # }}}
 
     # {{{ _append_epoch_outcome
@@ -411,10 +412,10 @@ class AgentTrainingPipeline:
 
     # {{{ _print_epoch_outcome
     def _print_epoch_outcome(self) -> None:
-        if self._epoch <= EPOCH_OUTCOME_LIMIT:
+        if self._epoch <= self._epoch_outcome_limit:
             print(self._epoch_outcome_deque[-1])
         else:
-            sys.stdout.write(f'\033[{EPOCH_OUTCOME_LIMIT}F')
+            sys.stdout.write(f'\033[{self._epoch_outcome_limit}F')
             sys.stdout.write('\033[K')
             print('\n'.join(self._epoch_outcome_deque))
     # }}}
@@ -422,85 +423,6 @@ class AgentTrainingPipeline:
     # {{{ _is_stopping
     def _is_stopping(self) -> bool:
         return self._early_stopper(self._validation_loss_all[-1], self._agent)
-    # }}}
-# }}}
-
-# {{{ VanillaNumericalAgentTrainingPipeline
-class VanillaNumericalAgentTrainingPipeline(AgentTrainingPipeline):
-    """A pipeline that trains a VanillaNumericalAgent to run forward solving."""
-
-    # {{{ __init__
-    def __init__(
-        self,
-        charge: np.ndarray,
-        ion_size: np.ndarray,
-        concentration: np.ndarray,
-        potential: np.ndarray,
-        slice_training: slice,
-        slice_validation: slice,
-        learning_rate: float,
-        optimiser_class: optim.Optimizer,
-        criterion_class: nn.Module,
-    ) -> None:
-        super().__init__(
-            optimisation_utils.VanillaNumericalAgent,
-            charge,
-            ion_size,
-            concentration,
-            potential,
-            slice_training,
-            slice_validation,
-            learning_rate,
-            optimiser_class,
-            criterion_class,
-        )
-    # }}}
-# }}}
-
-# {{{ NovelNumericalAgentTrainingPipeline
-class NovelNumericalAgentTrainingPipeline(AgentTrainingPipeline):
-    """A pipeline that trains a VanillaNumericalAgent to run forward solving."""
-
-    # {{{ __init__
-    def __init__(
-        self,
-        charge: np.ndarray,
-        ion_size: np.ndarray,
-        concentration: np.ndarray,
-        potential: np.ndarray,
-        slice_training: slice,
-        slice_validation: slice,
-        learning_rate: float,
-        optimiser_class: optim.Optimizer,
-        criterion_class: nn.Module,
-    ) -> None:
-        super().__init__(
-            optimisation_utils.NovelNumericalAgent,
-            charge,
-            ion_size,
-            concentration,
-            potential,
-            slice_training,
-            slice_validation,
-            learning_rate,
-            optimiser_class,
-            criterion_class,
-        )
-    # }}}
-
-    # {{{ _train
-    def _train(self) -> None:
-        self._agent.train()
-        prediction, reference = self._agent.infer(
-            self._candidate[self._slice_training,:],
-            self._reference[self._slice_training,:],
-        )
-        training_loss = self._criterion(prediction, reference)
-        training_loss.backward()
-        self._optimiser.step()
-        self._optimiser.zero_grad()
-        self._agent.clamp_selectivity_coefficient()
-        self._training_loss_all.append(training_loss.item())
     # }}}
 # }}}
 
