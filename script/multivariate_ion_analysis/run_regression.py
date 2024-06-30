@@ -12,7 +12,6 @@ import typing
 import numpy as np
 import torch
 
-from configuration import path_configuration
 from NESolver.utils import io_utils
 from NESolver.utils import optimisation_utils
 from NESolver.utils import pipeline_utils
