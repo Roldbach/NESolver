@@ -42,3 +42,16 @@ have provided our full source code and documentation here.
 
 
 ## Get Started
+### Environment Setup
+- Please use Anaconda/Miniconda to set up the required virtual environment with
+the provided environment configuration file.
+    ```
+    # 1. Go to the project root directory.
+    cd .../NESolver
+
+    # 2. Create the virtual environment with the environment configuration file.
+    conda env create -f environment.yml
+
+    # 3. Activate the virtual environment.
+    conda activate NESolver
+    ```
