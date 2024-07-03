@@ -56,12 +56,6 @@ def parse_argument() -> argparse.Namespace:
         help = 'the range of data used for training/calibration',
     )
     parser.add_argument(
-        '--validation_range',
-        default = slice(1000, 1100),
-        type = lambda x: slice(*map(int, x.strip('()').split(","))),
-        help = 'the range of data used for validation',
-    )
-    parser.add_argument(
         '--testing_range',
         default = slice(1100, 1200),
         type = lambda x: slice(*map(int, x.strip('()').split(","))),
