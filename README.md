@@ -58,3 +58,6 @@ the provided environment configuration file.
     # 4. Install local packages.
     pip install .
     ```
+
+### Data
+- All data used in the experiments are provided in the [data]('./data') directory.
