@@ -60,4 +60,25 @@ the provided environment configuration file.
     ```
 
 ### Data
-- All data used in the experiments are provided in the [data](data) directory.
+- All data used in the experiments is provided in the [data](data) directory.
+
+### Multivariate Ion Analysis
+- To run multivariate ion analysis with regression methods, please run the
+following command:
+    ```
+    ./script/multivariate_ion_analysis/run_regression.py  \
+        --file_path <file_path>                           \
+        --method <method>                                 \
+        --training_range <training_range>                 \
+        --validation_range <validation_range>             \
+        --testing_range <testing_range>                   \
+        --seed <seed>                                     \
+    ```
+    - `--file_path`: A **str** that specifies the file path of data used for the 
+    experiment.
+    - `--method`: A **str** that specifies the regression method used for the 
+    experiment. Please choose one from the following:
+        - 'OLS': Ordinary Least Squares Regression
+        - 'PLS': Partial Least Squares Regression
+        - 'BR': Bayesian Ridge Regression
+    - `--training_range`: A **tuple[int, int]** that specifies the range of 
