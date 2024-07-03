@@ -60,4 +60,4 @@ the provided environment configuration file.
     ```
 
 ### Data
-- All data used in the experiments are provided in the [data]('./data') directory.
+- All data used in the experiments are provided in the [data]('data') directory.
