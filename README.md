@@ -26,7 +26,8 @@
 > diverse composition, demonstrating its marginal superiority in terms of both
 > accuracy and chemical interpretability. By replicating the procedure under
 > different experimental conditions, we also showcased the capability of NESolver
-> to infer ion concentration beyond the calibration range and robustness to noise.<br>
+> to infer ion concentration beyond the calibration range and robustness to noise.
+> <br>
 >
 > **Conclusions:** NESolver has shown promising potential as an easy-to-use and
 > chemically interpretable tool for multivariate ion analysis, despite its
@@ -70,15 +71,39 @@ following command:
         --file_path <file_path>                           \
         --method <method>                                 \
         --training_range <training_range>                 \
-        --validation_range <validation_range>             \
         --testing_range <testing_range>                   \
         --seed <seed>                                     \
     ```
-    - `--file_path`: A **str** that specifies the file path of data used for the 
+    - `--file_path`: A `str` that specifies the file path of data used for the 
     experiment.
-    - `--method`: A **str** that specifies the regression method used for the 
+    - `--method`: A `str` that specifies the regression method used for the 
     experiment. Please choose one from the following:
         - 'OLS': Ordinary Least Squares Regression
         - 'PLS': Partial Least Squares Regression
         - 'BR': Bayesian Ridge Regression
-    - `--training_range`: A **tuple[int, int]** that specifies the range of 
+    - `--training_range`: A `tuple[int, int]` that specifies the range of data
+        used for training/calibrating the model in the format: '(start, end)'.
+    - `--testing_range`: A `tuple[int, int]` that specifies the range of data
+        used for testing the model in the format: '(start, end)'.
+    - `--seed`: An `int` that controls the randomness in the experiment.
+<br><br>
+
+- To run multivariate ion analysis with NESolver, please run the following
+command:
+    ```
+    ./script/multivariate_ion_analysis/run_optimisation.py  \
+        --file_path <file_path>                             \
+        --training_range <training_range>                   \
+        --validation_range <training_range>                 \
+        --testing_range <testing_range>                     \
+        --seed <seed>                                       \
+    ```
+    - `--file_path`: A `str` that specifies the file path of data used for the 
+    experiment.
+    - `--training_range`: A `tuple[int, int]` that specifies the range of data
+        used for training/calibrating the model in the format: '(start, end)'.
+    - `--validation_range`: A `tuple[int, int]` that specifies the range of data
+        used for validating the model in the format: '(start, end)'.
+    - `--testing_range`: A `tuple[int, int]` that specifies the range of data
+        used for testing the model in the format: '(start, end)'.
+    - `--seed`: An `int` that controls the randomness in the experiment.
